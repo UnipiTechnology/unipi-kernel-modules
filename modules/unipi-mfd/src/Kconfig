@@ -1,0 +1,51 @@
+config UNIPI_SPI
+	tristate "Unipi spi protocol driver"
+	default m
+	help
+	    Spi protocol driver for communicating with Unipi IO boards
+	    Module has name unipi.ko
+
+config UNIPI_MODBUS
+	tristate "Character device driver"
+	depends on UNIPI_SPI
+	default m
+	help
+	    Driver of character device /dev/unipichannel enabling access 
+	    to Unipi IO boards.
+
+config UNIPI_IOGROUP
+	tristate
+
+config UNIPI_MFD
+	tristate "Unipi multifunctional device (IO board)"
+	default m
+	select UNIPI_IOGROUP
+	help
+	    Unipi IO board as multifunctional device. Handle interrupt from 
+	    device. Exports common properties to sysfs.
+
+config UNIPI_LED
+	tristate "LED on Unipi IO board"
+	depends on UNIPI_MFD
+	default m
+
+config UNIPI_GPIO
+	tristate "Digital inputs and outputs on Unipi IO board"
+	depends on UNIPI_MFD
+	default m
+
+config UNIPI_IIO
+	tristate "Analog inputs and outputs on Unipi IO board"
+	depends on UNIPI_MFD
+	default m
+
+config UNIPI_UART
+	tristate "Uart port on Unipi IO board"
+	depends on UNIPI_MFD
+	default m
+
+config UNIPI_DALI
+	tristate "Dali port on Unipi IO board"
+	depends on UNIPI_MFD
+	default n
+

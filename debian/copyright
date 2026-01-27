@@ -3,18 +3,17 @@ Upstream-Name: unipi-kernel-modules
 Source: <url://example.com>
 
 Files: *
-Copyright: 2018 UniPi Technology <info@unipi.technology>
-License: GPL-3.0+
+Copyright: 2024 Unipi Technology <info@unipi.technology>
+License: GPL-2
 
 Files: debian/*
-Copyright: 2018 Miroslav Ondra <info@unipi.technology>
-License: GPL-3.0+
+Copyright: 2024 Miroslav Ondra <info@unipi.technology>
+License: GPL-2
 
-License: GPL-3.0+
- This program is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+License: GPL-2
+ This package is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License version 2 as
+ published by the Free Software Foundation.
  .
  This package is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,12 +21,8 @@ License: GPL-3.0+
  GNU General Public License for more details.
  .
  You should have received a copy of the GNU General Public License
- along with this program. If not, see <https://www.gnu.org/licenses/>.
+ along with this package; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  .
- On Debian systems, the complete text of the GNU General
- Public License version 3 can be found in "/usr/share/common-licenses/GPL-3".
-
-# Please also look if there are files or directories which have a
-# different copyright/license attached and list them here.
-# Please avoid picking licenses with terms that are more restrictive than the
-# packaged work, as it may make Debian's contributions unacceptable upstream.
+ On Debian systems, the complete text of the GNU General Public License version
+ 2 can be found in `/usr/share/common-licenses/GPL-2'.

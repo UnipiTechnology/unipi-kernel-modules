@@ -1,5 +1,5 @@
 /*
- * UniPi PLC device driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC device driver - Copyright (C) 2024 Unipi Technology
  * Author: Tomas Knot <tomasknot@gmail.com>
  *
  *  Based on the SC16IS7xx driver by Jon Ringle <jringle@gridpoint.com>,
@@ -24,6 +24,7 @@
 #include <linux/regmap.h>
 #include <linux/platform_device.h>
 #include <linux/nvmem-consumer.h>
+#include <linux/kstrtox.h>
 
 #include "unipi_common.h"
 #include "unipi_channel.h"
@@ -50,7 +51,7 @@ struct dev_mfd_of_attribute {
 };
 
 
-ssize_t unipi_mfd_show_version(struct device *dev,
+static ssize_t unipi_mfd_show_version(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -62,7 +63,7 @@ ssize_t unipi_mfd_show_version(struct device *dev,
 	return sysfs_emit(buf, "%d.%d\n", hi(val), lo(val));
 }
 
-ssize_t unipi_mfd_show_variant(struct device *dev,
+static ssize_t unipi_mfd_show_variant(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -74,7 +75,7 @@ ssize_t unipi_mfd_show_variant(struct device *dev,
 	return sysfs_emit(buf, "0x%02x-%d%s\n", hi(val), minor(val), is_cal(val)?" CAL":"");
 }
 
-ssize_t unipi_mfd_store_ulong(struct device *dev,
+__maybe_unused static ssize_t unipi_mfd_store_ulong(struct device *dev,
 			   struct device_attribute *attr,
 			   const char *buf, size_t size)
 {
@@ -92,7 +93,7 @@ ssize_t unipi_mfd_store_ulong(struct device *dev,
 	return size;
 }
 
-ssize_t unipi_mfd_show_ulong(struct device *dev,
+__maybe_unused static ssize_t unipi_mfd_show_ulong(struct device *dev,
 			  struct device_attribute *attr,
 			  char *buf)
 {
@@ -105,7 +106,7 @@ ssize_t unipi_mfd_show_ulong(struct device *dev,
 	return sysfs_emit(buf, "%ld\n", val);
 }
 
-ssize_t unipi_mfd_store_int(struct device *dev,
+__maybe_unused static ssize_t unipi_mfd_store_int(struct device *dev,
 			 struct device_attribute *attr,
 			 const char *buf, size_t size)
 {
@@ -127,7 +128,7 @@ ssize_t unipi_mfd_store_int(struct device *dev,
 	return size;
 }
 
-ssize_t unipi_mfd_show_int(struct device *dev,
+static ssize_t unipi_mfd_show_int(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -140,7 +141,7 @@ ssize_t unipi_mfd_show_int(struct device *dev,
 	return sysfs_emit(buf, "%d\n", val);
 }
 
-ssize_t unipi_mfd_store_reg(struct device *dev,
+static ssize_t unipi_mfd_store_reg(struct device *dev,
 			 struct device_attribute *attr,
 			 const char *buf, size_t size)
 {
@@ -161,7 +162,7 @@ ssize_t unipi_mfd_store_reg(struct device *dev,
 	return size;
 }
 
-ssize_t unipi_mfd_show_reg(struct device *dev,
+static ssize_t unipi_mfd_show_reg(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -173,7 +174,7 @@ ssize_t unipi_mfd_show_reg(struct device *dev,
 	return sysfs_emit(buf, "%d\n", val);
 }
 
-ssize_t unipi_mfd_showhex_reg(struct device *dev,
+static ssize_t unipi_mfd_showhex_reg(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -185,7 +186,7 @@ ssize_t unipi_mfd_showhex_reg(struct device *dev,
 	return sysfs_emit(buf, "0x%04x\n", val);
 }
 
-ssize_t unipi_mfd_store_bool(struct device *dev, struct device_attribute *attr,
+static ssize_t unipi_mfd_store_bool(struct device *dev, struct device_attribute *attr,
 			  const char *buf, size_t size)
 {
 	struct dev_mfd_attribute *ea = to_mfd_attr(attr);
@@ -193,7 +194,7 @@ ssize_t unipi_mfd_store_bool(struct device *dev, struct device_attribute *attr,
 	bool val;
 	int ret;
 
-	if (strtobool(buf, &val) < 0)
+	if (kstrtobool(buf, &val) < 0)
 		return -EINVAL;
 	ret = regmap_write(channel->coils, ea->reg, val);
 	if (ret<0) return ret;
@@ -201,7 +202,7 @@ ssize_t unipi_mfd_store_bool(struct device *dev, struct device_attribute *attr,
 	return size;
 }
 
-ssize_t unipi_mfd_show_bool(struct device *dev, struct device_attribute *attr,
+static ssize_t unipi_mfd_show_bool(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
 	struct dev_mfd_attribute *ea = to_mfd_attr(attr);
@@ -213,7 +214,7 @@ ssize_t unipi_mfd_show_bool(struct device *dev, struct device_attribute *attr,
 	return sysfs_emit(buf, "%d\n", !!val);
 }
 
-ssize_t unipi_mfd_show_regbool(struct device *dev, struct device_attribute *attr,
+__maybe_unused static ssize_t unipi_mfd_show_regbool(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
 	/* low 16bit is register address, high 16 bits is shift to get bit in register value */
@@ -242,7 +243,7 @@ static int unipi_mfd_of_get_regnum(struct device *dev, char* attrname)
 	return regaddr;
 }
 
-ssize_t unipi_mfd_show_wd_enable(struct device *dev, struct device_attribute *attr,
+static ssize_t unipi_mfd_show_wd_enable(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
 	struct unipi_channel *channel = to_unipi_iogroup_device(dev)->channel;
@@ -255,7 +256,7 @@ ssize_t unipi_mfd_show_wd_enable(struct device *dev, struct device_attribute *at
 	return sysfs_emit(buf, "%d\n", !!((val)&1));
 }
 
-ssize_t unipi_mfd_store_wd_enable(struct device *dev, struct device_attribute *attr,
+static ssize_t unipi_mfd_store_wd_enable(struct device *dev, struct device_attribute *attr,
 			  const char *buf, size_t size)
 {
 	struct unipi_channel *channel = to_unipi_iogroup_device(dev)->channel;
@@ -263,17 +264,17 @@ ssize_t unipi_mfd_store_wd_enable(struct device *dev, struct device_attribute *a
 	int ret, regaddr;
 
 	regaddr = unipi_mfd_of_get_regnum(dev, "master_watchdog_enable");
-	if (strtobool(buf, &val) < 0)
+	if (kstrtobool(buf, &val) < 0)
 		return -EINVAL;
 
-	if (strtobool(buf, &val) < 0)
+	if (kstrtobool(buf, &val) < 0)
 		return -EINVAL;
 	ret = regmap_write(channel->registers, regaddr, val);
 	if (ret<0) return ret;
 	return size;
 }
 
-ssize_t unipi_mfd_show_cycle(struct device *dev, struct device_attribute *attr,
+static ssize_t unipi_mfd_show_cycle(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
 	struct unipi_channel *channel = to_unipi_iogroup_device(dev)->channel;
@@ -439,7 +440,7 @@ static const struct attribute_group unipi_plc_group_def = {
 
 static const char *unipi_plc_linkname = "io_group%d";
 
-int device_match_unipi_plc(struct device *dev, const void *unused)
+static int device_match_unipi_plc(struct device *dev, const void *unused)
 {
 	if (!dev->driver && dev_name(dev) && (strcmp(dev_name(dev),"unipi_plc")==0))
 		return 1;
@@ -487,7 +488,7 @@ static void unipi_mfd_remove_plc(struct unipi_iogroup_device *iogroup)
 }
 #endif
 
-void unipi_mfd_poll_callback(void* cb_data, int result)
+static void unipi_mfd_poll_callback(void* cb_data, int result)
 {
 	struct unipi_iogroup_device *iogroup = (struct unipi_iogroup_device *) cb_data;
 	hrtimer_start_range_ns(&iogroup->poll_timer, 2000000, 4000000, HRTIMER_MODE_REL);
@@ -528,7 +529,7 @@ int unipi_mfd_enable_interrupt(struct unipi_iogroup_device *iogroup, u16 mask)
 EXPORT_SYMBOL_GPL(unipi_mfd_enable_interrupt);
 
 /* real irq handler - emit idle_op asynchronously */
-irqreturn_t unipi_mfd_irq(s32 irq, void *dev_id)
+static irqreturn_t unipi_mfd_irq(s32 irq, void *dev_id)
 {
 	struct unipi_iogroup_device *iogroup = (struct unipi_iogroup_device *)dev_id;
 	unipi_ping_async(iogroup->channel, NULL, NULL);
@@ -536,7 +537,7 @@ irqreturn_t unipi_mfd_irq(s32 irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-void unipi_mfd_int_status_callback(void* self, u8 int_status)
+static void unipi_mfd_int_status_callback(void* self, u8 int_status)
 {
 	struct unipi_iogroup_device *iogroup = (struct unipi_iogroup_device *)self;
 	/* int_status & UNIPI_MFD_INT_RX_NOT_EMPTY */
@@ -576,7 +577,7 @@ void unipi_mfd_int_status_callback(void* self, u8 int_status)
 */
 
 #define MAX_ALLOWED_FW 32
-int unipi_mfd_find_variant(struct device *dev, struct device_node *node, u16 fw_variant)
+static int unipi_mfd_find_variant(struct device *dev, struct device_node *node, u16 fw_variant)
 {
 	u32 allowed_fw_variants[MAX_ALLOWED_FW];
 	int i;
@@ -592,7 +593,7 @@ int unipi_mfd_find_variant(struct device *dev, struct device_node *node, u16 fw_
 	return 0;
 }
 
-int unipi_mfd_probe(struct unipi_iogroup_device *iogroup)
+static int unipi_mfd_probe(struct unipi_iogroup_device *iogroup)
 {
 	struct device *dev = &iogroup->dev;
 	//struct device_node *np = dev->of_node;
@@ -669,7 +670,7 @@ int unipi_mfd_probe(struct unipi_iogroup_device *iogroup)
 	return ret;
 }
 
-int unipi_mfd_remove(struct unipi_iogroup_device *iogroup)
+static int unipi_mfd_remove(struct unipi_iogroup_device *iogroup)
 {
 	if (iogroup->poll_timer.function != NULL) {
 		hrtimer_try_to_cancel(&iogroup->poll_timer);

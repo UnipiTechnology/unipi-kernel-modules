@@ -1,5 +1,5 @@
 /*
- * UniPi PLC device driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC device driver - Copyright (C) 2024 Unipi Technology
  * Author: Tomas Knot <tomasknot@gmail.com>
  *
  *
@@ -159,7 +159,7 @@ struct unipi_iio_device
  * Convert float32 (low_val:hight_val) to integer value / divider. 
  *   optionaly multiply value by factor
 */
-void float2int_with_divider(u16 low_val, u16 high_val, int factor, int* value, int* divider)
+static void float2int_with_divider(u16 low_val, u16 high_val, int factor, int* value, int* divider)
 {
         int exponent;
         //int i, mask;
@@ -205,7 +205,7 @@ void float2int_with_divider(u16 low_val, u16 high_val, int factor, int* value, i
         if (high_val & 0x8000) *value = -(*value);
 }
 
-int unipi_iio_map_mode_univ(struct iio_dev *indio_dev)
+static int unipi_iio_map_mode_univ(struct iio_dev *indio_dev)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	switch(n_iio->mode) {
@@ -218,7 +218,7 @@ int unipi_iio_map_mode_univ(struct iio_dev *indio_dev)
 	return -1;
 }
 
-int unipi_iio_map_mode_uioff(struct iio_dev *indio_dev)
+static int unipi_iio_map_mode_uioff(struct iio_dev *indio_dev)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	switch(n_iio->mode) {
@@ -228,7 +228,7 @@ int unipi_iio_map_mode_uioff(struct iio_dev *indio_dev)
 	return -1;
 }
 
-int unipi_iio_map_mode_rtd(struct iio_dev *indio_dev)
+static int unipi_iio_map_mode_rtd(struct iio_dev *indio_dev)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	switch(n_iio->mode) {
@@ -238,7 +238,7 @@ int unipi_iio_map_mode_rtd(struct iio_dev *indio_dev)
 	return -1;
 }
 
-int unipi_iio_map_mode_ui(struct iio_dev *indio_dev)
+static int unipi_iio_map_mode_ui(struct iio_dev *indio_dev)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	switch(n_iio->mode) {
@@ -248,7 +248,7 @@ int unipi_iio_map_mode_ui(struct iio_dev *indio_dev)
 	return -1;
 }
 
-int unipi_iio_map_mode_r18(struct iio_dev *indio_dev)
+static int unipi_iio_map_mode_r18(struct iio_dev *indio_dev)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	switch(n_iio->mode) {
@@ -257,7 +257,7 @@ int unipi_iio_map_mode_r18(struct iio_dev *indio_dev)
 	return -1;
 }
 
-int unipi_iio_map_mode_resistance(struct iio_dev *indio_dev)
+__maybe_unused static int unipi_iio_map_mode_resistance(struct iio_dev *indio_dev)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	switch(n_iio->mode) {
@@ -269,7 +269,7 @@ int unipi_iio_map_mode_resistance(struct iio_dev *indio_dev)
 }
 
 
-int unipi_iio_ai_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
+static int unipi_iio_ai_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	struct unipi_iio_platform *iio_platform = n_iio->unipi_iio_platform;
@@ -331,7 +331,7 @@ int unipi_iio_ai_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const 
 	return -EINVAL;
 }
 
-int unipi_iio_ai_read_raw_u32(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
+static int unipi_iio_ai_read_raw_u32(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	struct unipi_iio_platform *iio_platform = n_iio->unipi_iio_platform;
@@ -366,7 +366,7 @@ int unipi_iio_ai_read_raw_u32(struct iio_dev *indio_dev, struct iio_chan_spec co
 	return -EINVAL;
 }
 
-int unipi_iio_ao_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
+static int unipi_iio_ao_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	struct unipi_iio_platform *iio_platform = n_iio->unipi_iio_platform;
@@ -385,7 +385,7 @@ int unipi_iio_ao_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const 
 	return -EINVAL;
 }
 
-int unipi_iio_ao_write_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int val, int val2, long mask)
+static int unipi_iio_ao_write_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int val, int val2, long mask)
 {
 	struct unipi_iio_device *n_iio = iio_priv(indio_dev);
 	struct unipi_iio_platform *iio_platform = n_iio->unipi_iio_platform;
@@ -564,7 +564,7 @@ static int unipi_iio_probe(struct platform_device *pdev)
 	return 0;
 }
 
-int unipi_iio_remove(struct platform_device *pdev)
+__maybe_unused static int unipi_iio_remove(struct platform_device *pdev)
 {
 /*
 	int i;

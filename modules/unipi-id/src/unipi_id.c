@@ -24,8 +24,10 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
+#include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
+#include <linux/version.h>
 
 #include <linux/nvmem-consumer.h>
 #include <crypto/hash.h>
@@ -72,7 +74,7 @@ static const struct unipi_id_family_data unipi_id_family_ids[] = {
 	{ UNIEE_PLATFORM_FAMILY_G1XX,   "Gate"   },
 	{ UNIEE_PLATFORM_FAMILY_NEURON, "Neuron" },
 	{ UNIEE_PLATFORM_FAMILY_AXON,   "Axon"   },
-	{ UNIEE_PLATFORM_FAMILY_CM40,   "Cm40" },
+	{ UNIEE_PLATFORM_FAMILY_EDGE,   "Edge" },
 	{ UNIEE_PLATFORM_FAMILY_PATRON, "Patron" },
 	{ UNIEE_PLATFORM_FAMILY_IRIS,   "Iris", {0x50,0x51,0x52,0x53,0x54,0x55,0x56},
 	                                        {0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e},
@@ -122,13 +124,13 @@ EXPORT_SYMBOL_GPL(unipi_id_get_family_name);
 /*
     compare only start of string
 */
-int uniee_match_name(struct device *dev, const void *name)
+static int uniee_match_name(struct device *dev, const void *name)
 {
     return strncmp(dev_name(dev), name, strlen(name)) == 0;
 }
 
 
-struct nvmem_device * unipi_id_nvmem_get(struct device *dev, int nvmem_index)
+static struct nvmem_device * unipi_id_nvmem_get(struct device *dev, int nvmem_index)
 {
 	struct nvmem_device *nvmem;
 
@@ -146,7 +148,7 @@ struct nvmem_device * unipi_id_nvmem_get(struct device *dev, int nvmem_index)
 	returns size of data
 		or negative error
 */
-int unipi_id_load_nvmem(struct device *dev, int nvmem_index, uint8_t *buf)
+static int unipi_id_load_nvmem(struct device *dev, int nvmem_index, uint8_t *buf)
 {
 	struct nvmem_device *nvmem;
 	int size, ret;
@@ -169,12 +171,37 @@ int unipi_id_load_nvmem(struct device *dev, int nvmem_index, uint8_t *buf)
 	return size;
 }
 
+/* FixIt: */
+#define UNIEE_SPECDATA_COUNT 12
+#define UNIEE_SPECDATA_SIZE 64
+
+static uint8_t* unipi_eeprom_find_property(uint8_t *eprom, uniee_descriptor_area* descriptor, uint8_t property_type, int* len)
+{
+	int cur_type, i;
+	int dataindex = 0;
+
+	for (i=0; i < UNIEE_SPECDATA_COUNT; i++) {
+		cur_type = descriptor->board_info.specdata_headers_table[i].field_type |
+                   (((int)(descriptor->board_info.specdata_headers_table[i].field_len & (~0x3f)))<<2);
+		*len = descriptor->board_info.specdata_headers_table[i].field_len & (0x3f);
+		if ((dataindex + *len) >= UNIEE_SPECDATA_SIZE)
+			return NULL;
+		if (cur_type == property_type) {
+			return eprom + dataindex;
+		}
+		dataindex += *len;
+	}
+	return NULL;
+}
+
+
 static uniee_descriptor_area* unipi_id_load_boardmem(struct device *dev,
 				int nvmem_index, struct unipi_id_data * unipi_id, uint8_t *buf)
 {
 	uniee_descriptor_area *descriptor, *ndescriptor;
 	int size;
-	int i;
+	int i, name_length;
+	char *name;
 
 	size = unipi_id_load_nvmem(dev, nvmem_index, buf);
 	if (size < 0)
@@ -183,9 +210,15 @@ static uniee_descriptor_area* unipi_id_load_boardmem(struct device *dev,
 	descriptor = uniee_get_valid_descriptor(buf, size);
 
 	if (nvmem_index==0) {
+		unipi_id->model_fullname[0] = '\0';
 		if (descriptor) {
 			uniee_fix_legacy_content(buf, size, descriptor);
 			unipi_id->family_data = get_family_data(descriptor->product_info.platform_id);
+			name = unipi_eeprom_find_property(buf, descriptor, UNIEE_FIELD_TYPE_MODEL, &name_length);
+			if (name) {
+				name_length = name_length < sizeof(unipi_id->model_fullname)? name_length : sizeof(unipi_id->model_fullname);
+				strncpy(unipi_id->model_fullname, name, name_length);
+			}
 		} else {
 			unipi_id->family_data = get_family_data((platform_id_t){.raw_id = 0 });
 		}
@@ -233,6 +266,20 @@ static uniee_descriptor_area* unipi_id_get_descriptor(struct device *dev,
 
 static int do_checksum(struct device *dev,struct unipi_id_data *unipi_id, unsigned char *digest);
 
+static ssize_t product_model_full_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct unipi_id_data *unipi_id = dev_get_platdata(dev);
+	uniee_bank_3_t *bank3;
+	if (unipi_id == NULL)
+		return 0;
+	if (unipi_id->model_fullname[0] != '\0')
+		return scnprintf(buf, 255, "%.12s\n", unipi_id->model_fullname);
+
+	bank3 = &unipi_id->descriptor.product_info;
+	return scnprintf(buf, 255, "%.6s\n", bank3->model_str);
+}
+DEVICE_ATTR_RO(product_model_full);
+
 static ssize_t product_model_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct unipi_id_data *unipi_id = dev_get_platdata(dev);
@@ -262,9 +309,29 @@ static ssize_t product_serial_show(struct device *dev, struct device_attribute *
 	if (unipi_id == NULL)
 		return 0;
 	bank3 = &unipi_id->descriptor.product_info;
-	return scnprintf(buf, 255, "%d", bank3->product_serial);
+	return scnprintf(buf, 255, "%u", bank3->product_serial);
 }
 DEVICE_ATTR_RO(product_serial);
+
+static ssize_t product_family_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct unipi_id_data *unipi_id = dev_get_platdata(dev);
+	if (unipi_id == NULL)
+		return 0;
+	return scnprintf(buf, 255, "%s", unipi_id_get_family_name(unipi_id));
+}
+DEVICE_ATTR_RO(product_family);
+
+static ssize_t product_options_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct unipi_id_data *unipi_id = dev_get_platdata(dev);
+	uniee_bank_3_t *bank3;
+	if (unipi_id == NULL)
+		return 0;
+	bank3 = &unipi_id->descriptor.product_info;
+	return scnprintf(buf, 255, "%02X", bank3->mervis_license.bitmask);
+}
+DEVICE_ATTR_RO(product_options);
 
 static ssize_t product_description_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -397,7 +464,7 @@ DEVICE_ATTR_WO(refresh);
 
 static ssize_t api_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, 255, "1");
+	return scnprintf(buf, 255, "2");
 }
 
 DEVICE_ATTR_RO(api_version);
@@ -405,7 +472,10 @@ DEVICE_ATTR_RO(api_version);
 static struct attribute *unipi_id_attrs[] = {
 		&dev_attr_product_description.attr,
 		&dev_attr_product_model.attr,
+		&dev_attr_product_model_full.attr,
 		&dev_attr_product_serial.attr,
+		&dev_attr_product_family.attr,
+		&dev_attr_product_options.attr,
 		&dev_attr_platform_family.attr,
 		&dev_attr_platform_id.attr,
 		&dev_attr_mainboard_description.attr,
@@ -482,7 +552,7 @@ static ssize_t module_description_show(struct device *dev, struct device_attribu
 const char module_id_name[] = "card_id.";
 const char module_description_name[] = "card_description.";
 
-int unipi_id_add_modules(struct device *dev, struct unipi_id_data *unipi_id)
+static int unipi_id_add_modules(struct device *dev, struct unipi_id_data *unipi_id)
 {
 	char* names;
 	int names_len = 0;
@@ -553,7 +623,7 @@ static int unipi_id_do_refresh(struct device *dev, struct unipi_id_data *unipi_i
 	return 0;
 }
 
-int unipi_id_add_group(struct device *dev, struct unipi_id_data *unipi_id)
+static int unipi_id_add_group(struct device *dev, struct unipi_id_data *unipi_id)
 {
 	int ret;
 	ret = devm_device_add_group(dev, &unipi_id_group_def);
@@ -698,7 +768,7 @@ static struct i2c_client* unipi_id_load_client(struct i2c_adapter *adapter, unsi
 }
 
 
-int unipi_id_probe(struct platform_device *pdev)
+static int unipi_id_probe(struct platform_device *pdev)
 //struct i2c_adapter *adapter, uint32_t main_id, struct unipi_id_data * unipi_id_data)
 {
 	struct device *dev = &pdev->dev;
@@ -766,8 +836,11 @@ int unipi_id_probe(struct platform_device *pdev)
 	return 0;
 }
 
-
-int unipi_id_remove(struct platform_device *pdev)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+static int unipi_id_remove(struct platform_device *pdev)
+#else
+static void unipi_id_remove(struct platform_device *pdev)
+#endif
 {
 	struct unipi_id_data *unipi_id_data = dev_get_platdata(&pdev->dev);
 	int i;
@@ -781,7 +854,9 @@ int unipi_id_remove(struct platform_device *pdev)
 		if (unipi_id_data->loaded_descriptor[i])
 			kfree(unipi_id_data->loaded_descriptor[i]);
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id unipi_id_ids[] = {

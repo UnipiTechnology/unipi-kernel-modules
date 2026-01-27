@@ -19,6 +19,7 @@
 #include <linux/regulator/userspace-consumer.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/version.h>
 
 struct userspace_consumer_data {
 	const char *name;
@@ -195,7 +196,11 @@ err_enable:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 static int regulator_userspace_consumer_remove(struct platform_device *pdev)
+#else
+static void regulator_userspace_consumer_remove(struct platform_device *pdev)
+#endif
 {
 	struct userspace_consumer_data *data = platform_get_drvdata(pdev);
 
@@ -204,7 +209,9 @@ static int regulator_userspace_consumer_remove(struct platform_device *pdev)
 	if (data->enabled)
 		regulator_bulk_disable(data->num_supplies, data->supplies);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id regulator_userspace_consumer_of_match[] = {

@@ -1,5 +1,5 @@
 /*
- * UniPi PLC device driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC device driver - Copyright (C) 2024 Unipi Technology
  * Author: Tomas Knot <tomasknot@gmail.com>
  *
  *  Based on the SC16IS7xx driver by Jon Ringle <jringle@gridpoint.com>,
@@ -84,7 +84,7 @@ struct unipi_uart_device
 {
 	struct regmap		*regmap;
 	int			port_count;
-	struct unipi_uart_port	p[0];
+	struct unipi_uart_port	p[1];
 };
 
 
@@ -136,24 +136,24 @@ static void unipi_uart_set_iflags(struct unipi_uart_port *n_port, int to)
  * Empty functions *
  *******************/
 
-void unipi_uart_power(struct uart_port *port, s32 on)
+static void unipi_uart_power(struct uart_port *port, s32 on)
 {
     /* Do nothing */
 }
-void unipi_uart_set_mctrl(struct uart_port *port, u32 mctrl)
+static void unipi_uart_set_mctrl(struct uart_port *port, u32 mctrl)
 {
     /* Do nothing */
 }
-void unipi_uart_break_ctl(struct uart_port *port, int break_state)
+static void unipi_uart_break_ctl(struct uart_port *port, int break_state)
 {
     /* Do nothing */
 }
-void unipi_uart_null_void(struct uart_port *port)
+static void unipi_uart_null_void(struct uart_port *port)
 {
 	/* Do nothing */
 }
 
-void unipi_uart_stop_rx(struct uart_port *port)
+static void unipi_uart_stop_rx(struct uart_port *port)
 {
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
 	/*unsigned long flags;*/
@@ -162,14 +162,14 @@ void unipi_uart_stop_rx(struct uart_port *port)
 	/*spin_unlock_irqrestore(&port->lock, flags);*/
 }
 
-void unipi_uart_config_port(struct uart_port *port, int flags)
+static void unipi_uart_config_port(struct uart_port *port, int flags)
 {
 	if (flags & UART_CONFIG_TYPE) {
 		port->type = PORT_UNIPI;
 	}
 }
 
-int unipi_uart_verify_port(struct uart_port *port, struct serial_struct *s)
+static int unipi_uart_verify_port(struct uart_port *port, struct serial_struct *s)
 {
 	if ((s->type != PORT_UNKNOWN) && (s->type != PORT_UNIPI))
 		return -EINVAL;
@@ -179,7 +179,7 @@ int unipi_uart_verify_port(struct uart_port *port, struct serial_struct *s)
 	return 0;
 }
 
-void unipi_uart_pm(struct uart_port *port, u32 state, u32 oldstate)
+static void unipi_uart_pm(struct uart_port *port, u32 state, u32 oldstate)
 {
 	unipi_uart_power(port, (state == UART_PM_STATE_ON) ? 1 : 0);
 }
@@ -188,7 +188,7 @@ void unipi_uart_pm(struct uart_port *port, u32 state, u32 oldstate)
  * Non-static Functions *
  ************************/
  
-u32 unipi_spi_uart_get_cflag(struct regmap *map, u8 port)
+__maybe_unused static u32 unipi_spi_uart_get_cflag(struct regmap *map, u8 port)
 {
 	u32 value;
 	regmap_bulk_read(map, port_to_uartregs(port, UNIPI_MFD_REG_UART0_CFLAGS), &value, 2);
@@ -196,7 +196,7 @@ u32 unipi_spi_uart_get_cflag(struct regmap *map, u8 port)
 	return value;
 }
 
-void unipi_uart_set_ldisc(struct uart_port *port, struct ktermios *kterm)
+static void unipi_uart_set_ldisc(struct uart_port *port, struct ktermios *kterm)
 {
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
 	struct unipi_uart_device *n_uart = dev_get_drvdata(port->dev);
@@ -205,7 +205,7 @@ void unipi_uart_set_ldisc(struct uart_port *port, struct ktermios *kterm)
 }
 
 
-u32 neuronspi_uart_tx_empty(struct uart_port *port)
+static u32 neuronspi_uart_tx_empty(struct uart_port *port)
 {
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
     int len = n_port->tx_fifo_len;
@@ -227,13 +227,13 @@ u32 neuronspi_uart_tx_empty(struct uart_port *port)
 	return (n_port->tx_fifo_len==0) ? TIOCSER_TEMT : 0;
 }
 
-u32 unipi_uart_get_mctrl(struct uart_port *port)
+static u32 unipi_uart_get_mctrl(struct uart_port *port)
 {
 	unipi_uart_trace_1("ttyNS%d Get mctrl\n", port->line);
 	return TIOCM_DSR | TIOCM_CAR;
 }
 
-int unipi_uart_ioctl(struct uart_port *port, unsigned int ioctl_code, unsigned long ioctl_arg)
+static int unipi_uart_ioctl(struct uart_port *port, unsigned int ioctl_code, unsigned long ioctl_arg)
 {
 	u32 value;
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
@@ -266,9 +266,9 @@ int unipi_uart_ioctl(struct uart_port *port, unsigned int ioctl_code, unsigned l
 
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,0)
-void unipi_uart_set_termios(struct uart_port *port, struct ktermios *termios, struct ktermios *old)
+static void unipi_uart_set_termios(struct uart_port *port, struct ktermios *termios, struct ktermios *old)
 #else
-void unipi_uart_set_termios(struct uart_port *port, struct ktermios *termios, const struct ktermios *old)
+static void unipi_uart_set_termios(struct uart_port *port, struct ktermios *termios, const struct ktermios *old)
 #endif
 {
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
@@ -304,9 +304,9 @@ void unipi_uart_set_termios(struct uart_port *port, struct ktermios *termios, co
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)
-int unipi_uart_config_rs485(struct uart_port *port, struct serial_rs485 *rs485)
+static int unipi_uart_config_rs485(struct uart_port *port, struct serial_rs485 *rs485)
 #else
-int unipi_uart_config_rs485(struct uart_port *port, struct ktermios *termios, struct serial_rs485 *rs485)
+static int unipi_uart_config_rs485(struct uart_port *port, struct ktermios *termios, struct serial_rs485 *rs485)
 #endif
 {
 	port->rs485 = *rs485;
@@ -344,12 +344,12 @@ static void unipi_uart_update_timeout(struct unipi_uart_port *n_port, unsigned i
 	n_port->one_char_nsec = (((long)1000000 * bits) / baud)*1000;
 }
 
-const char* unipi_uart_type(struct uart_port *port)
+static const char* unipi_uart_type(struct uart_port *port)
 {
 	return port->type == PORT_UNIPI ? "UNIPISPI_NAME" : NULL;
 }
 
-int unipi_uart_request_port(struct uart_port *port)
+static int unipi_uart_request_port(struct uart_port *port)
 {
 	unipi_uart_trace("ttyNS%d Request port\n", port->line);
 	return 0;
@@ -399,80 +399,91 @@ static void unipi_uart_tx_callback(void *arg, int status)
 }
 
 
-void unipi_uart_handle_tx(struct unipi_uart_port *port, int calling) /* new async ver */
+void unipi_uart_handle_tx(struct unipi_uart_port *uport, int calling) /* new async ver */
 {
-	struct device* parent = port->port.dev->parent;
+	struct device* parent = uport->port.dev->parent;
 	struct unipi_channel *channel = to_unipi_iogroup_device(parent)->channel;
 	//struct unipi_mfd_device *mfd = dev_get_drvdata(parent);
 	int to_send, to_send_packet, need;
-	//unsigned long flags;
+	int ret;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
 	struct circ_buf *xmit;
-	int new_tail, ret;
+	int new_tail;
+#else
+	struct tty_port *__tport = &uport->port.state->port;
+#endif
 
 	//port->port.lock taken, This call must not sleep
 
-	if (unlikely(port->port.x_char)) {
+	if (unlikely(uport->port.x_char)) {
 		// zatim nevim, co s tim
-		port->port.icount.tx++;
-		port->port.x_char = 0;
+		uport->port.icount.tx++;
+		uport->port.x_char = 0;
 	}
 
-	xmit = &port->port.state->xmit;
-	//spin_lock_irqsave(&port->port.lock, flags);
 	// Get length of data pending in circular buffer
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
+	xmit = &uport->port.state->xmit;
 	to_send = uart_circ_chars_pending(xmit);
-	unipi_uart_trace("ttyNS%d Handle TX. to_send=%d calling=%d\n", port->port.line, to_send, calling);
-	if ((to_send == 0) || uart_tx_stopped(&port->port)) {
-		port->pending_txop = 0;
-		//spin_unlock_irqrestore(&port->port.lock, flags);
+#else
+	to_send = kfifo_len(&__tport->xmit_fifo);
+#endif
+	unipi_uart_trace("ttyNS%d Handle TX. to_send=%d calling=%d\n", uport->port.line, to_send, calling);
+	if ((to_send == 0) || uart_tx_stopped(&uport->port)) {
+		uport->pending_txop = 0;
 		// check tx_fifo status
-		if (port->tx_fifo_len) {
-			unipi_uart_trace_1("ttyNS%d Handle TX. Start timer=%llu", port->port.line, port->tx_fifo_len * port->one_char_nsec);
-			start_tx_timer(port, port->tx_fifo_len, 2);
+		if (uport->tx_fifo_len) {
+			unipi_uart_trace_1("ttyNS%d Handle TX. Start timer=%llu", uport->port.line, uport->tx_fifo_len * uport->one_char_nsec);
+			start_tx_timer(uport, uport->tx_fifo_len, 2);
 		}
 		return;
 	}
 
 	// Limit to size of (TX FIFO / 2 ) 
 	to_send_packet = (to_send > unipi_max_write_str_len(channel)) ? unipi_max_write_str_len(channel) : to_send;
-	need = to_send_packet - (UNIPI_UART_FIFO_SIZE - port->tx_fifo_len);
+	need = to_send_packet - (UNIPI_UART_FIFO_SIZE - uport->tx_fifo_len);
 	if (need > 0) {
-		//spin_unlock_irqrestore(&port->port.lock, flags);
 		if (calling!=CB_GETTXFIFO) {
-			if (unipi_uart_get_tx_fifo(port) == 0) return;
+			if (unipi_uart_get_tx_fifo(uport) == 0) return;
 		}
 		// reschedule work with pause
-		port->pending_txop = 0;
-		start_tx_timer(port, need, UNIPI_UART_FIFO_SIZE/4);
+		uport->pending_txop = 0;
+		start_tx_timer(uport, need, UNIPI_UART_FIFO_SIZE/4);
 		return;
 	}
 
 	// Read data from tty buffer and send it to spi
-	//spin_lock_irqsave(&port->port.lock, flags);
-	port->port.icount.tx += to_send_packet;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
 	new_tail = (xmit->tail + to_send_packet) & (UART_XMIT_SIZE - 1);
 	if (new_tail <= xmit->tail) {
-		 memcpy(port->tx_send_msg, xmit->buf+xmit->tail, UART_XMIT_SIZE - xmit->tail);
-		 memcpy(port->tx_send_msg+UART_XMIT_SIZE - xmit->tail, xmit->buf, new_tail);
+		 memcpy(uport->tx_send_msg, xmit->buf+xmit->tail, UART_XMIT_SIZE - xmit->tail);
+		 memcpy(uport->tx_send_msg+UART_XMIT_SIZE - xmit->tail, xmit->buf, new_tail);
 	} else {
-		memcpy(port->tx_send_msg, xmit->buf+xmit->tail, to_send_packet);
+		memcpy(uport->tx_send_msg, xmit->buf+xmit->tail, to_send_packet);
 	}
-	xmit->tail = new_tail;
-	//spin_unlock_irqrestore(&port->port.lock, flags);
-
-	unipi_uart_trace("ttyNS%d Handle TX Send: %d %16ph\n", port->port.line, to_send_packet, port->tx_send_msg);
-	ret = unipi_write_str_async(channel, port->dev_port, port->tx_send_msg, to_send_packet, 
-	                              port, unipi_uart_tx_callback);
+#else
+	to_send_packet = kfifo_out_peek(&__tport->xmit_fifo, uport->tx_send_msg, to_send_packet);
+#endif
+	unipi_uart_trace("ttyNS%d Handle TX Send: %d %16ph\n", uport->port.line, to_send_packet, uport->tx_send_msg);
+	ret = unipi_write_str_async(channel, uport->dev_port, uport->tx_send_msg, to_send_packet,
+	                              uport, unipi_uart_tx_callback);
 	if (ret != 0) {
 		//ERROR, try later
-		port->pending_txop = 0;
-		start_tx_timer(port, 10, UNIPI_UART_FIFO_SIZE/4);
-	} else if ((to_send-to_send_packet) < WAKEUP_CHARS) {
-		uart_write_wakeup(&port->port);
+		uport->pending_txop = 0;
+		start_tx_timer(uport, 10, UNIPI_UART_FIFO_SIZE/4);
+	} else {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
+		xmit->tail = new_tail;
+		uport->port.icount.tx += to_send_packet;
+#else
+		uart_xmit_advance(&uport->port, to_send_packet);
+#endif
+		if ((to_send-to_send_packet) < WAKEUP_CHARS)
+			uart_write_wakeup(&uport->port);
 	}
 }
 
-void unipi_uart_start_tx(struct uart_port *port)
+static void unipi_uart_start_tx(struct uart_port *port)
 {
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port,port);
 	unsigned long flags;
@@ -491,7 +502,7 @@ void unipi_uart_start_tx(struct uart_port *port)
 }
 
 
-void unipi_uart_get_tx_fifo_callback(void* cb_data, int result)
+static void unipi_uart_get_tx_fifo_callback(void* cb_data, int result)
 {
     unsigned long flags;
 	struct unipi_uart_port *n_port = (struct unipi_uart_port *)cb_data;
@@ -567,7 +578,7 @@ static void unipi_uart_handle_rx(struct unipi_uart_port *port, int rxlen, u8* pb
 
 /* called from read_str_async operation 
 */
-void unipi_uart_rx_callback(void* cb_data, int result)
+static void unipi_uart_rx_callback(void* cb_data, int result)
 {
 	struct unipi_uart_port *n_port = (struct unipi_uart_port *)cb_data;
 	struct device* parent = n_port->port.dev->parent;
@@ -639,7 +650,7 @@ static int unipi_uart_start_rx_process(struct unipi_uart_port *n_port)
 	return 0;
 }
 
-void unipi_uart_flush_buffer(struct uart_port* port)
+static void unipi_uart_flush_buffer(struct uart_port* port)
 { 
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
 
@@ -656,7 +667,7 @@ void unipi_uart_flush_buffer(struct uart_port* port)
 }
 
 /* called from unipi_spi when priority data are received */
-void unipi_uart_rx_char_callback(void *self, u8 port, u8 ch, int remain)
+static void unipi_uart_rx_char_callback(void *self, u8 port, u8 ch, int remain)
 {
 	struct unipi_uart_device *n_uart = (struct unipi_uart_device *)self;
 	struct unipi_uart_port *n_port;
@@ -676,7 +687,7 @@ void unipi_uart_rx_char_callback(void *self, u8 port, u8 ch, int remain)
 }
 
 /* called from unipi_mfd_int_status_callback when interrupt status contains RX flags */
-void unipi_uart_rx_not_empty_callback(void *self, int port)
+static void unipi_uart_rx_not_empty_callback(void *self, int port)
 {
 	struct unipi_uart_device *n_uart = (struct unipi_uart_device *)self;
 	struct unipi_uart_port *n_port;
@@ -688,7 +699,7 @@ void unipi_uart_rx_not_empty_callback(void *self, int port)
 
 
 // Initialise the driver - called once on open
-int unipi_uart_startup(struct uart_port *port)
+static int unipi_uart_startup(struct uart_port *port)
 {
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
 	struct device* parent = n_port->port.dev->parent;
@@ -705,7 +716,7 @@ int unipi_uart_startup(struct uart_port *port)
 }
 
 
-void unipi_uart_shutdown(struct uart_port *port)
+static void unipi_uart_shutdown(struct uart_port *port)
 {
 	unipi_uart_trace("ttyNS%d Shutdown\n", port->line);
 	unipi_uart_power(port, 0);
@@ -736,7 +747,7 @@ static const struct uart_ops unipi_uart_ops =
 };
 
 
-int unipi_uart_port_probe(struct device *dev, struct unipi_uart_device *n_uart, int i, int irq, int port_line)
+static int unipi_uart_port_probe(struct device *dev, struct unipi_uart_device *n_uart, int i, int irq, int port_line)
 {
     
 	struct unipi_uart_port* port;
@@ -797,7 +808,7 @@ int unipi_uart_port_probe(struct device *dev, struct unipi_uart_device *n_uart, 
 
 
 
-int unipi_uart_probe(struct platform_device *pdev)
+static int unipi_uart_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device *parent = dev->parent;
@@ -860,7 +871,11 @@ out:
 	return ret;
 }
 
-int unipi_uart_remove(struct platform_device *pdev)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+static int unipi_uart_remove(struct platform_device *pdev)
+#else
+static void unipi_uart_remove(struct platform_device *pdev)
+#endif
 {
 	struct unipi_uart_device *n_uart = platform_get_drvdata(pdev);
 	struct device* parent = pdev->dev.parent;
@@ -883,7 +898,9 @@ int unipi_uart_remove(struct platform_device *pdev)
 		unipi_uart_power(&port->port, 0);
 		//printk(KERN_INFO "UNIPIUART: Serial port ttyNS%d removed\n", i + n_spi->uart_pindex);
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 	return 0;
+#endif
 }
 
 /*********************

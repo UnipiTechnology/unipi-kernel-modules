@@ -11,6 +11,10 @@
 #include "unipi_iogroup_bus.h"
 #include "unipi_channel.h"
 
+struct unipi_iogroup_device *iogroup_alloc_device(struct unipi_channel *channel);
+int iogroup_add_device(struct unipi_iogroup_device *iogroup);
+
+
 static void iogroupdev_release(struct device *dev)
 {
 	struct unipi_iogroup_device	*iogroup = to_unipi_iogroup_device(dev);
@@ -23,7 +27,11 @@ static void iogroupdev_release(struct device *dev)
 	kfree(iogroup);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 static int iogroup_match_device(struct device *dev, struct device_driver *drv)
+#else
+static int iogroup_match_device(struct device *dev, const struct device_driver *drv)
+#endif
 {
 	const struct unipi_iogroup_device	*iogroup = to_unipi_iogroup_device(dev);
 
@@ -265,7 +273,8 @@ register_iogroup_device(struct unipi_channel *channel, int reg, const char* moda
 	}
 
 	/* Select device driver */
-	strlcpy(iogroup->modalias, modalias, sizeof(iogroup->modalias));
+	strncpy(iogroup->modalias, modalias, sizeof(iogroup->modalias));
+	iogroup->modalias[sizeof(iogroup->modalias)-1] = 0;
 	iogroup->address = reg;
 
 	/* Register the new device */

@@ -1,5 +1,5 @@
 /*
- * UniPi PLC device driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC device driver - Copyright (C) 2024 Unipi Technology
  * Author: Tomas Knot <tomasknot@gmail.com>
  *
  *
@@ -87,7 +87,7 @@ struct unipi_iio_stm_device
  * 		transformation from raw is   V = ( raw * k14 + f14)  >> 14
  * 		                        or   A = ( raw * k13 + f13 ) >> 13
  */
-void unipi_iio_stm_read_vref(struct unipi_iio_stm_device *n_iio)
+static void unipi_iio_stm_read_vref(struct unipi_iio_stm_device *n_iio)
 {
 	u32 vref_int = 0;
 	u32 vref_inp = 0;
@@ -115,21 +115,25 @@ void unipi_iio_stm_read_vref(struct unipi_iio_stm_device *n_iio)
 #else
 	d1 = (((u64)9900 << 2)*vref_int*(10000+err1));
 	d2 = 10000*vref_inp;
-	n_iio->kvolt = do_div(d1,d2);
+	do_div(d1,d2);
+	n_iio->kvolt = d1;
 
 	d1 = ((u64)offs1 << 14);
-	n_iio->fvolt = do_div(d1, 10);
+	do_div(d1, 10);
+	n_iio->fvolt = d1;
 
 	d1 = (((u64)33000 << 1)*vref_int*(10000+err2));
 	d2 = 10000*vref_inp;
-	n_iio->kamp = do_div(d1, d2);
+	do_div(d1, d2);
+	n_iio->kamp = d1;
 
 	d1 = ((u64)offs2 << 13);
-	n_iio->famp = do_div(d1, 10);
+	do_div(d1, 10);
+	n_iio->famp = d1;
 #endif
 }
 
-void unipi_iio_stm_read_vref_rev(struct unipi_iio_stm_device *n_iio)
+static void unipi_iio_stm_read_vref_rev(struct unipi_iio_stm_device *n_iio)
 {
 	u32 vref_int = 0;
 	u32 vref_inp = 0;
@@ -148,26 +152,21 @@ void unipi_iio_stm_read_vref_rev(struct unipi_iio_stm_device *n_iio)
 	vref_inp = vref_inp ? : 11328;
 	vref_int = vref_int ? : 12208;
 
-	/* ToDo: use do_div */
-//#if ARM64
 #ifdef CONFIG_ARM64
 	n_iio->kvolt = (((u64)vref_inp << 16) * 4095*10000) / vref_int / (9900 * (10000+err1));
-	n_iio->fvolt = (((u64)vref_inp << 16) * 4095 * offs1) / vref_int / 99000;
-	n_iio->kamp = (((u64)vref_inp << 17) * 4095*10000) / vref_int / (33000 * (10000+err1));
-	n_iio->famp = (((u64)vref_inp << 17) * 4095 * offs1) / vref_int / 33000;
+	n_iio->fvolt = (((u64)vref_inp << 16) * 4095 * offs1) / vref_int / 9900;
+	n_iio->kamp = (((u64)vref_inp << 17) * 4095*10000) / vref_int / (33000 * (10000+err2));
+	n_iio->famp = (((u64)vref_inp << 17) * 4095 * offs2) / vref_int / 33000;
 #else
-	d1 = (((u64)vref_inp << 16) * 4095*10000);
-	d2 = vref_int * (9900 * (10000+err1));
-	n_iio->kvolt = do_div(d1, d2);
-	d1 = ((u64)vref_inp << 16) * 4095 * offs1;
-	d2 = (vref_int * 99000);
-	n_iio->fvolt = do_div(d1, d2);
-	d1 = (((u64)vref_inp << 16) * 4095*10000);
-	d2 = vref_int * (33000 * (10000+err1));
-	n_iio->kamp = do_div(d1, d2);
-	d1 = ((u64)vref_inp << 16) * 4095 * offs1;
-	d2 = vref_int * 33000;
-	n_iio->famp = do_div(d1, d2);
+	/* do_div  - doesn't work in case of big numbers, so we use simplified expression*/
+	d1 = (((u64)vref_inp << 16) * 4095);
+	do_div(d1, (vref_int * 9900));
+	n_iio->kvolt = d1;
+	n_iio->fvolt = 0;
+	d1 = (((u64)vref_inp << 17) * 4095);
+	do_div(d1, (vref_int * 33000));
+	n_iio->kamp = d1;
+	n_iio->famp = 0;
 #endif
 }
 
@@ -288,7 +287,7 @@ void unipi_iio_stm_ao_set_current(struct iio_dev *indio_dev, struct iio_chan_spe
 	regmap_write(n_spi->reg_map, n_spi->regstart_table->stm_ao_val_reg, (unsigned int)stm_true_val);
 }
 */
-int unipi_iio_stm_ai_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask) {
+static int unipi_iio_stm_ai_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask) {
 
 	struct unipi_iio_stm_device *n_iio = iio_priv(indio_dev);
 	u32 stm_val = 0;
@@ -324,7 +323,7 @@ int unipi_iio_stm_ai_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec co
 }
 
 
-int unipi_iio_stm_ao_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
+static int unipi_iio_stm_ao_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int *val, int *val2, long mask)
 {
 	struct unipi_iio_stm_device *n_iio = iio_priv(indio_dev);
 	u32 stm_val = 0;
@@ -369,7 +368,7 @@ int unipi_iio_stm_ao_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec co
 	return -EINVAL;
 }
 
-int unipi_iio_stm_ao_write_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int val, int val2, long mask)
+static int unipi_iio_stm_ao_write_raw(struct iio_dev *indio_dev, struct iio_chan_spec const *ch, int val, int val2, long mask)
 {
 	struct unipi_iio_stm_device *n_iio = iio_priv(indio_dev);
 	u32 stm_val = 0;
@@ -394,7 +393,7 @@ int unipi_iio_stm_ao_write_raw(struct iio_dev *indio_dev, struct iio_chan_spec c
 			if (mask == IIO_CHAN_INFO_RAW) {
 				if (val >=0) stm_val = val;
 			} else {
-				stm_val = ((val *1000 + val2/1000) * n_iio->kamp + n_iio->famp) >> 17;
+				stm_val = (((u64)val *1000 + val2/1000) * n_iio->kamp + n_iio->famp) >> 17;
 			}
 			if (stm_val > 4095) stm_val=4095;
 			regmap_write(n_iio->map, n_iio->valreg, stm_val);
@@ -461,7 +460,7 @@ static const struct iio_info unipi_iio_stm_ao_info = {
 	.attrs = &unipi_iio_stm_ao_group,
 };
 
-int unipi_iio_stm_ai_register(struct device* dev, struct regmap *map, int group_index, int valreg, int modereg)
+static int unipi_iio_stm_ai_register(struct device* dev, struct regmap *map, int group_index, int valreg, int modereg)
 {
 	struct iio_dev *iio_dev;
 	struct unipi_iio_stm_device *n_iio;
@@ -486,7 +485,7 @@ int unipi_iio_stm_ai_register(struct device* dev, struct regmap *map, int group_
 	return 0;
 }
 
-int unipi_iio_stm_ao_register(struct device* dev, struct regmap *map, int group_index, int valreg, int modereg, int r_valreg)
+static int unipi_iio_stm_ao_register(struct device* dev, struct regmap *map, int group_index, int valreg, int modereg, int r_valreg)
 {
 	struct iio_dev *iio_dev;
 	struct unipi_iio_stm_device *n_iio;

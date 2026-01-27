@@ -1,5 +1,5 @@
 /*
- * Implements line discpline for using with Neuron/Axon.
+ * Implements line discpline.
  * 
  * Author: Miroslav Ondra <ondra@faster.cz>
  *
@@ -195,7 +195,7 @@ int unipi_tty_init(void)
 	err = tty_register_ldisc(N_PROFIBUS_FDL, &unipi_tty_ldisc);
 #endif
 	if (err) {
-		printk(KERN_INFO "UniPi line discipline registration failed. (%d)", err);
+		printk(KERN_INFO "Unipi line discipline registration failed. (%d)", err);
 		return err;
 	}
 	return 0;

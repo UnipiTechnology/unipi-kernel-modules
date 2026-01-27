@@ -63,6 +63,7 @@ struct unipi_id_data
 	int fingerprint_loaded;
 	uint8_t fingerprint[UNIPI_ID_FINGERPRINT_SIZE];
 	uniee_descriptor_area *loaded_descriptor[UNIPI_ID_MAX_IDS];
+	char model_fullname[12];
 };
 
 const char* unipi_id_get_family_name(struct unipi_id_data *unipi_id);

@@ -1,2 +1,0 @@
-#!/bin/bash
-git subtree pull --prefix unipi-hardware-id git@git.unipi.technology:UniPi/unipi-hardware-id.git main --squash

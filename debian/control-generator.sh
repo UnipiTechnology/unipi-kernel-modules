@@ -14,15 +14,9 @@ PROJECT_VERSION=$(dpkg-parsechangelog -S Version)
 if [ -z "${PRODUCT}" ]; then
     ################## dkms #################333
     BINARY_PKG_NAME=unipi-kernel-modules-dkms
-    if [ "${DEBIAN_VERSION}" == "stretch" -o "${DEBIAN_VERSION}" == "buster" ]; then
-        pre_depends="raspberrypi-kernel-headers | axon-kernel-headers | g1-kernel-headers | zulu-kernel-headers, unipi-common"
-        depends="unipi-firmware (>=5.50)"
-    else
-        unset pre_depends
-        depends="raspberrypi-kernel-headers | unipi-kernel-headers, unipi-os-configurator-data"
-        #suggests="unipi-firmware"
-        unset suggests
-    fi
+    unset pre_depends
+    depends="raspberrypi-kernel-headers | unipi-kernel-headers, unipi-os-configurator-data"
+    unset suggests
     cat >debian/rules.in <<EOF
 %:
 	dh \$@  --with dkms
@@ -51,27 +45,16 @@ fi
 case "${PRODUCT}" in
     unipi1 | neuron)
         BINARY_PKG_NAME=unipi-kernel-modules
-        if [ "${DEBIAN_VERSION}" == "bullseye" ]; then
-            PKG_KERNEL_HEADERS=raspberrypi-kernel-headers
-            PKG_KERNEL_IMAGE=raspberrypi-kernel
-        else
-            PKG_KERNEL_HEADERS="linux-headers-rpi-v7 linux-headers-rpi-v7l"
-            PKG_KERNEL_IMAGE=linux-image-rpi-v7
-            ALTERNATIVE_KERNEL_IMAGE=linux-image-rpi-v7l
-        fi
+        PKG_KERNEL_HEADERS="linux-headers-rpi-v7"
+        PKG_KERNEL_IMAGE=linux-image-rpi-v7
         ;;
     neuron64 | unipi1x64)
         BINARY_PKG_NAME=unipi-kernel-modules
-        if [ "${DEBIAN_VERSION}" == "bullseye" ]; then
-            PKG_KERNEL_HEADERS=raspberrypi-kernel-headers
-            PKG_KERNEL_IMAGE=raspberrypi-kernel
-        else
-            PKG_KERNEL_HEADERS="linux-headers-rpi-v8 linux-headers-rpi-2712"
-            PKG_KERNEL_IMAGE=linux-image-rpi-v8
-            ALTERNATIVE_KERNEL_IMAGE=linux-image-rpi-2712
-        fi
+        PKG_KERNEL_HEADERS="linux-headers-rpi-v8 linux-headers-rpi-2712"
+        PKG_KERNEL_IMAGE=linux-image-rpi-v8
+        ALTERNATIVE_KERNEL_IMAGE=linux-image-rpi-2712
         ;;
-    neuron64u | neuronu | unipi1u | unipi1x64u)
+    neuron64u | neuronu | unipi1u | unipi1x64u | edge | g1 | zulu | iris | patron)
         BINARY_PKG_NAME=unipi-kernel-modules
         PKG_KERNEL_HEADERS=unipi-kernel-headers
         PKG_KERNEL_IMAGE=unipi-kernel
@@ -80,40 +63,6 @@ case "${PRODUCT}" in
         BINARY_PKG_NAME=unipi-kernel-modules
         PKG_KERNEL_HEADERS=axon-kernel-headers
         PKG_KERNEL_IMAGE=axon-kernel-image
-        ;;
-    g1 )
-        if [ "${DEBIAN_VERSION}" == "buster" ]; then
-            BINARY_PKG_NAME=g1-unipi-kernel-modules
-            PKG_KERNEL_HEADERS=g1-kernel-headers
-            PKG_KERNEL_IMAGE=g1-kernel-image
-        else
-            BINARY_PKG_NAME=unipi-kernel-modules
-            PKG_KERNEL_HEADERS=unipi-kernel-headers
-            PKG_KERNEL_IMAGE=unipi-kernel
-        fi
-        ;;
-    zulu )
-        if [ "${DEBIAN_VERSION}" == "buster" ]; then
-            BINARY_PKG_NAME=zulu-unipi-kernel-modules
-            PKG_KERNEL_HEADERS=zulu-kernel-headers
-            PKG_KERNEL_IMAGE=zulu-kernel-image
-        else
-            BINARY_PKG_NAME=unipi-kernel-modules
-            PKG_KERNEL_HEADERS=unipi-kernel-headers
-            PKG_KERNEL_IMAGE=unipi-kernel
-        fi
-        ;;
-    iris )
-        # build for >=bullseye
-        BINARY_PKG_NAME=unipi-kernel-modules
-        PKG_KERNEL_HEADERS=unipi-kernel-headers
-        PKG_KERNEL_IMAGE=unipi-kernel
-        ;;
-    patron )
-        # build for >=bullseye
-        BINARY_PKG_NAME=unipi-kernel-modules
-        PKG_KERNEL_HEADERS=unipi-kernel-headers
-        PKG_KERNEL_IMAGE=unipi-kernel
         ;;
 esac
 
@@ -132,18 +81,14 @@ fi
 
 
 if [ "${PRODUCT}" = "neuron" ] || [ "${PRODUCT}" = "unipi1" ] ; then
-    if [ "$DEBIAN_VERSION" = "bookworm" ]; then
-        PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
-    fi
+    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
     # in raspberrypi-kernel-headers can be more than one kernels for different SoC
-    LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/lib\/modules\/.*-v7.*\/build$/p'))
+    LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/usr\/lib\/modules\/.*-v7.*\/build$/p'))
     LINUX_DIR_PATH="${LINUX_DIR_ARR[*]}"
 
 elif [ "${PRODUCT}" = "neuron64" ] || [ "${PRODUCT}" = "unipi1x64" ] ; then
-    if [ "$DEBIAN_VERSION" = "bookworm" ]; then
-        PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
-    fi
-    LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/lib\/modules\/.*\/build$/p'))
+    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
+    LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/usr\/lib\/modules\/.*\/build$/p'))
     LINUX_DIR_PATH="${LINUX_DIR_ARR[*]}"
 
 else
@@ -153,7 +98,7 @@ fi
 #####################################################################
 ### Create changelog for binary packages with modified version string
 
-if [ "$PRODUCT" == "neuron64u" ] || [ "$PRODUCT" == "neuronu" ] || [ "$PRODUCT" == "unipi1u" ] || [ "$PRODUCT" == "unipi1x64u" ]; then
+if [ "$PRODUCT" == "neuron64u" ] || [ "$PRODUCT" == "neuronu" ] || [ "$PRODUCT" == "unipi1u" ] || [ "$PRODUCT" == "unipi1x64u" ] || [ "$PRODUCT" == "edge" ] ; then
     MODULES_VERSION=${PROJECT_VERSION}~${PKG_KERNEL_VER_STRIPPED}
 else
     MODULES_VERSION=${PROJECT_VERSION}.${PKG_KERNEL_VER_STRIPPED}
@@ -169,20 +114,15 @@ cat debian/changelog >>debian/${BINARY_PKG_NAME}.changelog
 #####################################################################
 ### Append binary packages definition to control file
 
-if [ "${DEBIAN_VERSION}" == "stretch" -o "${DEBIAN_VERSION}" == "buster" ]; then
-    pre_depends="unipi-common"
-    depends="unipi-firmware (>=5.50)"
-else
-    unset pre_depends
-    depends="unipi-os-configurator-data(>=0.7.test.20220815)"
-    #suggests="unipi-firmware"
-    unset suggests
-    if [ "$PRODUCT" = "neuron" ] && [ "${DEBIAN_VERSION}" = "bullseye" ]; then
-        depends="$depends, unipi-kernel-modules-64on32"
-    fi
-    if [ "$PRODUCT" = "neuron" ] && [ "${DEBIAN_VERSION}" = "bookworm" ]; then
-        recommends="unipi-kernel-modules-64on32:arm64"
-    fi
+unset pre_depends
+depends="unipi-os-configurator-data(>=0.7.test.20220815)"
+#suggests="unipi-firmware"
+unset suggests
+if [ "$PRODUCT" = "neuron" ] && [ "${DEBIAN_VERSION}" = "bullseye" ]; then
+    depends="$depends, unipi-kernel-modules-64on32"
+fi
+if [ "$PRODUCT" = "neuron" ] && [ "${DEBIAN_VERSION}" = "bookworm" ]; then
+    recommends="unipi-kernel-modules-64on32:arm64"
 fi
 
 if [ ${BINARY_PKG_NAME} == "unipi-kernel-modules" ]; then
@@ -211,8 +151,8 @@ Suggests: ${suggests}
 Provides: ${provides}
 Replaces: ${replaces}
 Breaks: ${breaks}
-Description: UniPi kernel modules
- Binary kernel modules for UniPi Neuron/Axon/Patron/Iris controller.
+Description: Unipi kernel modules
+ Binary kernel modules for Unipi controllers.
  Compiled for ${PKG_KERNEL_IMAGE} version ${PKG_KERNEL_VER}.
 
 EOF
@@ -252,7 +192,7 @@ if [ "$PRODUCT" = "neuron64" ] && [ "${DEBIAN_VERSION}" = "bullseye" ]; then
 Package: unipi-kernel-modules-64on32
 Architecture: all
 Depends: ${PKG_KERNEL_IMAGE}(=${PKG_KERNEL_VER})
-Description: UniPi Neuron kernel modules for 32bit Raspbian with 64bit kernel
+Description: Unipi kernel modules for 32bit Raspbian with 64bit kernel
  Use only on system with raspberrypi 32bit OS with running 64bit kernel.
  Requires unipi-kernel-modules (armhf) installed.
 
@@ -276,7 +216,7 @@ if [ "$PRODUCT" = "neuron64" ] && [ "${DEBIAN_VERSION}" = "bookworm" ]; then
 Package: unipi-kernel-modules-64on32
 Architecture: arm64
 Depends: ${PKG_KERNEL_IMAGE}:arm64(=${PKG_KERNEL_VER})
-Description: UniPi Neuron kernel modules for 32bit Raspbian with 64bit kernel
+Description: Unipi kernel modules for 32bit Raspbian with 64bit kernel
  Use only on system with raspberrypi 32bit OS with running 64bit kernel.
  Requires unipi-kernel-modules (armhf) installed.
 

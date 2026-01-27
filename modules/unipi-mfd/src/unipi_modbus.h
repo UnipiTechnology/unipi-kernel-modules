@@ -1,5 +1,5 @@
 /*
- * UniPi PLC modbus channel driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC modbus channel driver - Copyright (C) 2024 Unipi Technology
  * 
  * Author: Tomas Knot <tomasknot@gmail.com>
  * Author: Miroslav Ondra <ondra@faster.cz>
@@ -38,7 +38,7 @@ void unipi_modbus_classdev_unregister(struct device *dev);
 
 struct unipi_channel * unipi_modbus_dev_by_address(u8 modbus_address);
 
-int __init unipi_modbus_init(void);
-void __exit unipi_modbus_exit(void);
+//int __init unipi_modbus_init(void);
+//void __exit unipi_modbus_exit(void);
 
 #endif /* MODULES_UNIPI_SPI_SRC_UNIPI_MODBUS_H_ */

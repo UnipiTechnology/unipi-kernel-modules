@@ -1,5 +1,5 @@
 /*
- * UniPi Multi Function Device Driver - Copyright (C) 2021 UniPi Technology
+ * Unipi Multi Function Device Driver - Copyright (C) 2024 Unipi Technology
  *
  * Author: Miroslav Ondra <ondra@faster.cz>
  *

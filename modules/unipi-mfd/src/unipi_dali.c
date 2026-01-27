@@ -1,5 +1,5 @@
 /*
- * UniPi PLC device driver - Copyright (C) 2022 UniPi Technology
+ * Unipi PLC device driver - Copyright (C) 2024 Unipi Technology
  * Author: Miroslav Ondra <ondra@faster.cz>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -85,7 +85,7 @@ struct unipi_dali_device
 {
 	struct regmap		*regmap;
 	int			port_count;
-	struct unipi_dali_port	p[0];
+	struct unipi_dali_port	p[1];
 };
 
 
@@ -121,23 +121,23 @@ static inline int port_to_uartregs(u8 port, u16 reg)
 /*******************
  * Empty functions *
  *******************/
-void unipi_dali_set_mctrl(struct uart_port *port, u32 mctrl)
+static void unipi_dali_set_mctrl(struct uart_port *port, u32 mctrl)
 {
     /* Do nothing */
 }
 
-u32 unipi_dali_get_mctrl(struct uart_port *port)
+static u32 unipi_dali_get_mctrl(struct uart_port *port)
 {
 	unipi_dali_trace_1("dali%d Get mctrl\n", port->line);
 	return TIOCM_DSR | TIOCM_CAR;
 }
 
-void unipi_dali_null_void(struct uart_port *port)
+static void unipi_dali_null_void(struct uart_port *port)
 {
 	/* Do nothing */
 }
 
-void unipi_dali_stop_rx(struct uart_port *port)
+static void unipi_dali_stop_rx(struct uart_port *port)
 {
 	struct unipi_dali_port *n_port = to_unipi_dali_port(port, port);
 	/*unsigned long flags;*/
@@ -146,12 +146,12 @@ void unipi_dali_stop_rx(struct uart_port *port)
 	/*spin_unlock_irqrestore(&port->lock, flags);*/
 }
 
-const char* unipi_dali_type(struct uart_port *port)
+static const char* unipi_dali_type(struct uart_port *port)
 {
 	return port->type == PORT_DALI ? "UNIPI_DALI" : NULL;
 }
 
-void unipi_dali_config_port(struct uart_port *port, int flags)
+static void unipi_dali_config_port(struct uart_port *port, int flags)
 {
 	if (flags & UART_CONFIG_TYPE) {
 		port->type = PORT_DALI;
@@ -163,9 +163,9 @@ void unipi_dali_config_port(struct uart_port *port, int flags)
  ************************/
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,0)
-void unipi_dali_set_termios(struct uart_port *port, struct ktermios *termios, struct ktermios *old)
+static void unipi_dali_set_termios(struct uart_port *port, struct ktermios *termios, struct ktermios *old)
 #else
-void unipi_dali_set_termios(struct uart_port *port, struct ktermios *termios, const struct ktermios *old)
+static void unipi_dali_set_termios(struct uart_port *port, struct ktermios *termios, const struct ktermios *old)
 #endif
 {
 //	struct unipi_uart_port *n_port = to_unipi_dali_port(port, port);
@@ -202,7 +202,7 @@ void unipi_dali_set_termios(struct uart_port *port, struct ktermios *termios, co
 }
 
 
-u32 unipi_dali_tx_empty(struct uart_port *port)
+static u32 unipi_dali_tx_empty(struct uart_port *port)
 {
 	struct unipi_dali_port *n_port = to_unipi_dali_port(port, port);
 	//int len = n_port->tx_fifo_len;
@@ -227,7 +227,7 @@ u32 unipi_dali_tx_empty(struct uart_port *port)
 }
 
 
-int unipi_dali_ioctl(struct uart_port *port, unsigned int ioctl_code, unsigned long ioctl_arg)
+static int unipi_dali_ioctl(struct uart_port *port, unsigned int ioctl_code, unsigned long ioctl_arg)
 {
 /*	u32 value;
 	struct unipi_dali_port *n_port = to_unipi_dali_port(port, port);
@@ -280,75 +280,83 @@ static void unipi_dali_tx_callback(void *arg, int status)
 }
 
 
-void unipi_dali_handle_tx(struct unipi_dali_port *port, int calling) /* new async ver */
+void unipi_dali_handle_tx(struct unipi_dali_port *uport, int calling) /* new async ver */
 {
-	struct device* parent = port->port.dev->parent;
+	struct device* parent = uport->port.dev->parent;
 	struct unipi_channel *channel = to_unipi_iogroup_device(parent)->channel;
 	//struct unipi_mfd_device *mfd = dev_get_drvdata(parent);
 	int to_send, to_send_packet;//, need;
-	//unsigned long flags;
+	int ret;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
 	struct circ_buf *xmit;
-	int new_tail, ret;
+	int new_tail;
+#else
+	struct tty_port *__tport = &uport->port.state->port;
+#endif
 
 	//port->port.lock taken, This call must not sleep
 
-	port->has_tx_data = 0;
-	xmit = &port->port.state->xmit;
-	//spin_lock_irqsave(&port->port.lock, flags);
+	uport->has_tx_data = 0;
 	// Get length of data pending in circular buffer
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
+	xmit = &uport->port.state->xmit;
 	to_send = uart_circ_chars_pending(xmit);
-	unipi_dali_trace("dali%d Handle TX. to_send=%d calling=%d\n", port->port.line, to_send, calling);
-	if ((to_send == 0) || uart_tx_stopped(&port->port)) {
-		port->pending_txop = 0;
-		//spin_unlock_irqrestore(&port->port.lock, flags);
-		// check tx_fifo status
-		//if (port->tx_fifo_len) {
-		//	unipi_dali_trace_1("dali%d Handle TX. Start timer=%llu", port->port.line, port->tx_fifo_len * port->one_char_nsec);
-		//	start_tx_timer(port);
-		//}
+#else
+	to_send = kfifo_len(&__tport->xmit_fifo);
+#endif
+	unipi_dali_trace("dali%d Handle TX. to_send=%d calling=%d\n", uport->port.line, to_send, calling);
+	if ((to_send == 0) || uart_tx_stopped(&uport->port)) {
+		uport->pending_txop = 0;
 		return;
 	}
 	// Limit to size of 4 ) 
 	to_send_packet = (to_send >= 4) ? 4 : to_send;
-	if (port->st_sending) {
+	if (uport->st_sending) {
 		// reschedule work with pause
-		port->pending_txop = 0;
-		port->has_tx_data = 1;
+		uport->pending_txop = 0;
+		uport->has_tx_data = 1;
 		//start_tx_timer(port);
 		return;
 	}
 
 	// Read data from tty buffer and send it to spi
-	//spin_lock_irqsave(&port->port.lock, flags);
-	port->port.icount.tx += to_send_packet;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
 	new_tail = (xmit->tail + to_send_packet) & (UART_XMIT_SIZE - 1);
 	if (new_tail <= xmit->tail) {
-		memcpy(port->tx_send_msg, xmit->buf+xmit->tail, UART_XMIT_SIZE - xmit->tail);
-		memcpy(port->tx_send_msg+UART_XMIT_SIZE - xmit->tail, xmit->buf, new_tail);
+		 memcpy(uport->tx_send_msg, xmit->buf+xmit->tail, UART_XMIT_SIZE - xmit->tail);
+		 memcpy(uport->tx_send_msg+UART_XMIT_SIZE - xmit->tail, xmit->buf, new_tail);
 	} else {
-		memcpy(port->tx_send_msg, xmit->buf+xmit->tail, to_send_packet);
+		memcpy(uport->tx_send_msg, xmit->buf+xmit->tail, to_send_packet);
 	}
-	xmit->tail = new_tail;
-	//spin_unlock_irqrestore(&port->port.lock, flags);
+#else
+	to_send_packet = kfifo_out_peek(&__tport->xmit_fifo, uport->tx_send_msg, to_send_packet);
+#endif
 
 	if (to_send_packet == 4) {
 		unipi_dali_trace("dali%d Handle TX Send (%d): %4ph\n", port->port.line, to_send_packet, port->tx_send_msg);
-		ret = unipi_write_regs_async(channel, port->tx_reg, 2, port->tx_send_msg, port, unipi_dali_tx_callback);
+		ret = unipi_write_regs_async(channel, uport->tx_reg, 2, uport->tx_send_msg, uport, unipi_dali_tx_callback);
 	} else {
-		unipi_dali_trace("dali%d TX discard: Not enough data (%d): %4ph\n", port->port.line, to_send_packet, port->tx_send_msg);
-		port->pending_txop = 0;
+		unipi_dali_trace("dali%d TX discard: Not enough data (%d): %4ph\n", uport->port.line, to_send_packet, uport->tx_send_msg);
+		uport->pending_txop = 0;
 		ret = 0;
 	}
 	if (ret != 0) {
 		//ERROR, try later
-		port->pending_txop = 0;
-//		start_tx_timer(port);
-	} else if ((to_send-to_send_packet) < WAKEUP_CHARS) {
-		uart_write_wakeup(&port->port);
+		uport->pending_txop = 0;
+
+	} else {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
+		xmit->tail = new_tail;
+		uport->port.icount.tx += to_send_packet;
+#else
+		uart_xmit_advance(&uport->port, to_send_packet);
+#endif
+		if ((to_send-to_send_packet) < WAKEUP_CHARS)
+			uart_write_wakeup(&uport->port);
 	}
 }
 
-void unipi_dali_start_tx(struct uart_port *port)
+static void unipi_dali_start_tx(struct uart_port *port)
 {
 	struct unipi_dali_port *n_port = to_unipi_dali_port(port,port);
 	unsigned long flags;
@@ -438,7 +446,7 @@ static void unipi_dali_handle_rx(struct unipi_dali_port *port, int rxlen, u8* pb
 
 /* called from read_str_async operation 
 */
-void unipi_dali_status_callback(void* cb_data, int result)
+static void unipi_dali_status_callback(void* cb_data, int result)
 {
 	struct unipi_dali_port *n_port = (struct unipi_dali_port *)cb_data;
 	struct device* parent = n_port->port.dev->parent;
@@ -518,7 +526,7 @@ static int unipi_dali_start_poll_process(struct unipi_dali_port *n_port)
 	return 0;
 }
 
-void unipi_dali_flush_buffer(struct uart_port* port)
+static void unipi_dali_flush_buffer(struct uart_port* port)
 { 
 	struct unipi_dali_port *n_port = to_unipi_dali_port(port, port);
 
@@ -536,7 +544,7 @@ void unipi_dali_flush_buffer(struct uart_port* port)
 
 
 /* called from unipi_mfd_int_status_callback when interrupt status contains RX flags */
-void unipi_dali_rx_not_empty_callback(void *self, int port)
+__maybe_unused static void unipi_dali_rx_not_empty_callback(void *self, int port)
 {
 	struct unipi_dali_device *n_uart = (struct unipi_dali_device *)self;
 	struct unipi_dali_port *n_port;
@@ -548,7 +556,7 @@ void unipi_dali_rx_not_empty_callback(void *self, int port)
 
 
 // Initialise the driver - called once on open
-int unipi_dali_startup(struct uart_port *port)
+static int unipi_dali_startup(struct uart_port *port)
 {
 	struct unipi_dali_port *n_port = to_unipi_dali_port(port, port);
 //	struct device* parent = n_port->port.dev->parent;
@@ -576,7 +584,7 @@ int unipi_dali_startup(struct uart_port *port)
 }
 
 
-void unipi_dali_shutdown(struct uart_port *port)
+static void unipi_dali_shutdown(struct uart_port *port)
 {
 	struct unipi_dali_port *n_port = to_unipi_dali_port(port, port);
 	n_port->is_polling_mode = 0;
@@ -622,7 +630,7 @@ static const struct uart_ops unipi_dali_ops =
 };
 
 
-int unipi_dali_port_probe(struct device *dev, struct unipi_dali_device *n_uart, int i, int irq)
+static int unipi_dali_port_probe(struct device *dev, struct unipi_dali_device *n_uart, int i, int irq)
 {
     
 	struct unipi_dali_port* port;
@@ -673,7 +681,7 @@ int unipi_dali_port_probe(struct device *dev, struct unipi_dali_device *n_uart, 
 
 
 
-int unipi_dali_probe(struct platform_device *pdev)
+static int unipi_dali_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device *parent = dev->parent;
@@ -733,7 +741,11 @@ out:
 	return ret;
 }
 
-int unipi_dali_remove(struct platform_device *pdev)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+static int unipi_dali_remove(struct platform_device *pdev)
+#else
+static void unipi_dali_remove(struct platform_device *pdev)
+#endif
 {
 	struct unipi_dali_device *n_uart = platform_get_drvdata(pdev);
 	struct device* parent = pdev->dev.parent;
@@ -753,7 +765,9 @@ int unipi_dali_remove(struct platform_device *pdev)
 		hrtimer_cancel(&port->timer);
 		uart_remove_one_port(&unipi_dali_uart_driver, &port->port);
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 	return 0;
+#endif
 }
 
 /*********************

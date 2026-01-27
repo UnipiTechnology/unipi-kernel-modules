@@ -35,11 +35,11 @@ static int unipi_spi2_zip_reg(enum UNIPI_SPI_OP op, unsigned int reg)
 	if ((op == UNIPI_SPI_OP_WRITEREG) || (op == UNIPI_SPI_OP_WRITEBITS)) ret |= 0x10;
 
 	if ((op == UNIPI_SPI_OP_WRITEREG) || (op == UNIPI_SPI_OP_READREG)) {
-		if (reg < 64) return ret | (reg << 8);
+		if (reg < 255) return ret | (reg << 8);
 		if (reg < 500) return -EIO;
-		if (reg < 564) return ret | 0x1 | (((reg-500) & 0x3f) << 8);
+		if (reg < 755) return ret | 0x1 | (((reg-500)) << 8);
 		if (reg < 1000) return -EIO;
-		if (reg < 1064) return  ret | 0x2 |  (((reg-1000) & 0x3f) << 8);
+		if (reg < 1255) return  ret | 0x2 |  (((reg-1000)) << 8);
 	} else {
 		if (reg < 64) return ret | 0x4 | (reg << 8);
 		if (reg < 1000) return -EIO;
@@ -50,7 +50,7 @@ static int unipi_spi2_zip_reg(enum UNIPI_SPI_OP op, unsigned int reg)
 }
 
 
-int unipi_spi2_parse_frame(struct unipi_spi_context* context, struct unipi_spi_devstatus *devstatus, struct unipi_spi_reply *reply)
+static int unipi_spi2_parse_frame(struct unipi_spi_context* context, struct unipi_spi_devstatus *devstatus, struct unipi_spi_reply *reply)
 {
 	u16 recv_crc;
 	u8* reply_data;
@@ -84,6 +84,9 @@ int unipi_spi2_parse_frame(struct unipi_spi_context* context, struct unipi_spi_d
 		reply->ret = 0;
 	else if (reg + context->len > reply_max_count)
 		reply->ret = reply_max_count - reg;
+	else if (reply->opcode == UNIPI_SPI_OP2_READSTR)
+		/* combine len + remain */
+		reply->ret = context->len | ((reply_max_count - context->len)<<8);
 	else
 		reply->ret = context->len;
 
@@ -98,7 +101,7 @@ int unipi_spi2_parse_frame(struct unipi_spi_context* context, struct unipi_spi_d
 /* upper part of all async opertations
  * - create context with space for 2+add_trans transactions
  * - setup data of first part */
-struct unipi_spi_context *unipi_spi2_alloc_context(struct spi_device* spi_dev, enum UNIPI_SPI_OP op, uint16_t fastop)
+static struct unipi_spi_context *unipi_spi2_alloc_context(struct spi_device* spi_dev, enum UNIPI_SPI_OP op, uint16_t fastop)
                                                    //unsigned int len)
 {
 	int trans_count, freq;
@@ -106,7 +109,7 @@ struct unipi_spi_context *unipi_spi2_alloc_context(struct spi_device* spi_dev, e
 	struct spi_transfer * s_trans;
 	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 
-	trans_count = 1;
+	trans_count = 2;
 	context = kzalloc(sizeof(struct unipi_spi_context) + trans_count * sizeof(struct spi_transfer), GFP_NOWAIT);
 	if (! context) {
 		return NULL;
@@ -121,11 +124,13 @@ struct unipi_spi_context *unipi_spi2_alloc_context(struct spi_device* spi_dev, e
 	s_trans = (struct spi_transfer *)(context + 1);
 	spi_message_init_with_transfers(&context->message, s_trans, trans_count);
 
-	s_trans[0].bits_per_word = UNIPI_SPI_B_PER_WORD;
-	s_trans[0].speed_hz = freq;
-	s_trans[0].len = UNIPI_SPI2_MESSAGE_LEN+2;
-	s_trans[0].tx_buf = context->tx_header;
-	s_trans[0].rx_buf = context->rx_header;
+	s_trans[0].delay.value = UNIPI_SPI2_EDGE_DELAY;
+	s_trans[0].delay.unit = SPI_DELAY_UNIT_USECS;
+	s_trans[1].bits_per_word = UNIPI_SPI_B_PER_WORD;
+	s_trans[1].speed_hz = freq;
+	s_trans[1].len = UNIPI_SPI2_MESSAGE_LEN+2;
+	s_trans[1].tx_buf = context->tx_header;
+	s_trans[1].rx_buf = context->rx_header;
 
 	context->message.context = context;
 	context->message.spi = spi_dev;
@@ -144,7 +149,7 @@ struct unipi_spi_context *unipi_spi2_alloc_context(struct spi_device* spi_dev, e
  * 		regcount = 1..2   pro WRITEREGS
  *		         = 1..32  pro WRITEBITS
  */ 
-int unipi_spi2_write_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
+static int unipi_spi2_write_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
                            unsigned int reg, unsigned int count, u8* data,
                            void* cb_data, OperationCallback cb_function)
 {
@@ -177,7 +182,7 @@ int unipi_spi2_write_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
  * 		regcount = 1..2   pro READREG
  *		         = 1..32  pro READBIT
  */ 
-int unipi_spi2_read_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
+static int unipi_spi2_read_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
                            unsigned int reg, unsigned int count, u8 *data,
                            void* cb_data, OperationCallback cb_function)
 {
@@ -246,7 +251,7 @@ finish:
 	kfree(cb_multi);
 }
 
-int unipi_spi2_read_regs_async(void* self, unsigned int reg, unsigned int count, u8 *data,
+static int unipi_spi2_read_regs_async(void* self, unsigned int reg, unsigned int count, u8 *data,
                            void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
@@ -270,7 +275,7 @@ int unipi_spi2_read_regs_async(void* self, unsigned int reg, unsigned int count,
 }
 
 
-int unipi_spi2_write_regs_async(void* self, unsigned int reg, unsigned int count, u8 *data,
+static int unipi_spi2_write_regs_async(void* self, unsigned int reg, unsigned int count, u8 *data,
                            void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
@@ -293,7 +298,7 @@ int unipi_spi2_write_regs_async(void* self, unsigned int reg, unsigned int count
 	return unipi_spi2_write_simple(spi_dev, UNIPI_SPI_OP_WRITEREG, reg, min((cb_multi->count), (unsigned int)4), data, cb_multi, multi_callback);
 }
 
-int unipi_spi2_write_str_async(void* self, unsigned int port, u8* data, unsigned int count, 
+static int unipi_spi2_write_str_async(void* self, unsigned int port, u8* data, unsigned int count,
                               void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
@@ -317,7 +322,7 @@ int unipi_spi2_write_str_async(void* self, unsigned int port, u8* data, unsigned
 	return unipi_spi_exec_context(spi_dev, context, cb_data, cb_function);
 }
 
-int unipi_spi2_read_str_async(void* self, unsigned int port, u8* data, unsigned int count, 
+static int unipi_spi2_read_str_async(void* self, unsigned int port, u8* data, unsigned int count,
                              void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
@@ -342,7 +347,7 @@ int unipi_spi2_read_str_async(void* self, unsigned int port, u8* data, unsigned 
 
 
 /*  Async op for WRITEBIT */
-int unipi_spi2_write_bits_async(void* self, unsigned int reg, unsigned int count, u8* data,
+static int unipi_spi2_write_bits_async(void* self, unsigned int reg, unsigned int count, u8* data,
                               void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
@@ -353,7 +358,7 @@ int unipi_spi2_write_bits_async(void* self, unsigned int reg, unsigned int count
 }
 
 /*  Async op for READBIT */
-int unipi_spi2_read_bits_async(void* self, unsigned int reg, unsigned int count, u8* data,
+static int unipi_spi2_read_bits_async(void* self, unsigned int reg, unsigned int count, u8* data,
                               void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
@@ -364,7 +369,7 @@ int unipi_spi2_read_bits_async(void* self, unsigned int reg, unsigned int count,
 }
 
  
-int unipi_spi2_idle_op_async(void* self, void* cb_data, OperationCallback cb_function)
+static int unipi_spi2_idle_op_async(void* self, void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
 	struct unipi_spi_context *context;

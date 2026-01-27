@@ -24,6 +24,11 @@ struct regmap_async {
 	int padding[2];
 };
 void regmap_async_complete_cb(struct regmap_async *async, int ret);
+struct regmap *devm_regmap_init_unipi_regs(struct unipi_channel *channel,
+					const struct regmap_config *config);
+struct regmap *devm_regmap_init_unipi_coils(struct unipi_channel *channel,
+					const struct regmap_config *config);
+
 
 
 struct unipi_regmap_async {
@@ -38,7 +43,7 @@ static void unipi_regmap_complete(void *data, int result)
     if (async->buffer) kfree(async->buffer);
 }
 
-int unipi_regmap_hw_read(void *context, const void *reg_buf, size_t reg_size, void *val_buf, size_t val_size)
+static int unipi_regmap_hw_read(void *context, const void *reg_buf, size_t reg_size, void *val_buf, size_t val_size)
 {
 	struct unipi_channel *channel = context;
 	u16 *buffer;
@@ -58,7 +63,7 @@ int unipi_regmap_hw_read(void *context, const void *reg_buf, size_t reg_size, vo
 	return 0;
 }
 
-int unipi_regmap_hw_reg_read(void *context, unsigned int reg, unsigned int *val)
+static int unipi_regmap_hw_reg_read(void *context, unsigned int reg, unsigned int *val)
 {
 	struct unipi_channel *channel = context;
 	u16 buf[4];
@@ -70,7 +75,7 @@ int unipi_regmap_hw_reg_read(void *context, unsigned int reg, unsigned int *val)
 	return 0;
 }
 
-int unipi_regmap_hw_gather_write(void *context, const void *reg, size_t reg_size,
+static int unipi_regmap_hw_gather_write(void *context, const void *reg, size_t reg_size,
                                  const void *val, size_t val_size)
 {
 	struct unipi_channel *channel = context;
@@ -91,12 +96,12 @@ int unipi_regmap_hw_gather_write(void *context, const void *reg, size_t reg_size
 	return ret;
 }
 
-int unipi_regmap_hw_write(void *context, const void *buf, size_t buf_size)
+static int unipi_regmap_hw_write(void *context, const void *buf, size_t buf_size)
 {
 	return unipi_regmap_hw_gather_write(context, buf, sizeof(u16), (u8*)buf + sizeof(u16), buf_size-sizeof(u16));
 }
 
-int unipi_regmap_hw_reg_write(void *context, unsigned int reg, unsigned int val)
+static int unipi_regmap_hw_reg_write(void *context, unsigned int reg, unsigned int val)
 {
 	struct unipi_channel *channel = context;
 	if (unipi_write_regs_sync(channel, reg, 1, (u16*)&val) == 1) 
@@ -192,7 +197,7 @@ static const struct regmap_config unipi_regmap_config_default =
 };
 
 
-int unipi_regmap_hw_read_coil(void *context, const void *reg_buf, size_t reg_size, void *val_buf, size_t val_size)
+static int unipi_regmap_hw_read_coil(void *context, const void *reg_buf, size_t reg_size, void *val_buf, size_t val_size)
 {
 	struct unipi_channel *channel = context;
 	u32 buffer[2];
@@ -207,7 +212,7 @@ int unipi_regmap_hw_read_coil(void *context, const void *reg_buf, size_t reg_siz
 	return 0;
 }
 
-int unipi_regmap_hw_reg_read_coil(void *context, unsigned int reg, unsigned int *val)
+static int unipi_regmap_hw_reg_read_coil(void *context, unsigned int reg, unsigned int *val)
 {
 	struct unipi_channel *channel = context;
 	u32 buf[2] = {0,0};
@@ -219,7 +224,7 @@ int unipi_regmap_hw_reg_read_coil(void *context, unsigned int reg, unsigned int 
 	return 0;
 }
 
-int unipi_regmap_hw_reg_write_coil(void *context, unsigned int reg, unsigned int val)
+static int unipi_regmap_hw_reg_write_coil(void *context, unsigned int reg, unsigned int val)
 {
 	struct unipi_channel *channel = context;
 
@@ -227,7 +232,7 @@ int unipi_regmap_hw_reg_write_coil(void *context, unsigned int reg, unsigned int
     return 0;
 }
 
-int unipi_regmap_hw_gather_write_coil(void *context, const void *reg, size_t reg_len,
+static int unipi_regmap_hw_gather_write_coil(void *context, const void *reg, size_t reg_len,
                                  const void *val, size_t val_len)
 {
 	/* Max coil count is 32 -> use buffer with 32 bits data */
@@ -249,7 +254,7 @@ int unipi_regmap_hw_gather_write_coil(void *context, const void *reg, size_t reg
     return ret >= 0;
 }
 
-int unipi_regmap_hw_write_coil(void *context, const void *buf, size_t buf_size)
+static int unipi_regmap_hw_write_coil(void *context, const void *buf, size_t buf_size)
 {
 	return unipi_regmap_hw_gather_write_coil(context, buf, sizeof(u16), (u8*)buf + sizeof(u16), buf_size-sizeof(u16));
 }

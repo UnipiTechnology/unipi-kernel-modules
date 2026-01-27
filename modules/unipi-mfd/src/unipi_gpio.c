@@ -486,13 +486,21 @@ static int unipi_gpio_probe(struct platform_device *pdev)
 	return devm_gpiochip_add_data(&pdev->dev, &unipi_gpiochip->chip, unipi_gpiochip);
 }
 
-int unipi_gpio_remove(struct platform_device *pdev)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+static int unipi_gpio_remove(struct platform_device *pdev)
+#else
+static void unipi_gpio_remove(struct platform_device *pdev)
+#endif
 {
 	struct unipi_gpiochip_device *unipi_gpiochip = (struct unipi_gpiochip_device*) platform_get_drvdata(pdev);
 	struct unipi_gpio_sysfs_kobj *kobj, *kobj_d;
 
 	if (!unipi_gpiochip || !unipi_gpiochip->data)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 		return 0;
+#else
+		return;
+#endif
 	kobj = unipi_gpiochip->kobj;
 	while (kobj) {
 		kobj_d = kobj;
@@ -500,7 +508,9 @@ int unipi_gpio_remove(struct platform_device *pdev)
 		kobject_del(&kobj_d->kobject);
 		kobject_put(&kobj_d->kobject);
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id of_unipi_gpio_match[] = {

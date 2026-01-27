@@ -175,7 +175,8 @@ static inline uniee_descriptor_area* uniee_get_valid_descriptor(uint8_t* buff, i
 static inline void uniee_fix_legacy_content(uint8_t* buff, int size, uniee_descriptor_area *descriptor)
 {
 	/* Check and fix mervis option */
-	if ((~descriptor->product_info.mervis_license.bitmask) != descriptor->product_info.mervis_license.bitmask_inverted) {
+	if ((~(descriptor->product_info.mervis_license.bitmask) & 0xff) !=
+	    (descriptor->product_info.mervis_license.bitmask_inverted & 0xff)) {
 		descriptor->product_info.mervis_license.bitmask = 0;
 		descriptor->product_info.mervis_license.bitmask_inverted = 0xff;
 	}

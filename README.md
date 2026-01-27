@@ -1,18 +1,17 @@
-* Kernel modules (version 2) required for UniPi Neuron/Axon/Patron/Iris PLC
+# Unipi kernel modules v2
 
-You need Linux kernel source to compile this modules.
-Tested for kernel versions 5.10 .. 5.15.5
-
-
-* To cross-compile modules
-
-CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 CCPREFIX=aarch64-linux-gnu- make LINUX_DIR_PATH=<path to linux src tree>
+Unipi PLCs require those modules in order to access I/O.
+You need the Linux kernel source to compile these modules.
+Tested for kernel versions 6.12
 
 
-* Device tree overlays for activating modules
+- Cross-compiling modules:
 
-Device tree sources for various platforms are available in repositories
+`CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 make LINUX_DIR_PATH=<path to linux src tree>`
 
-   https://github.com/UniPiTechnology/os-configurator-data-patron
-   https://github.com/UniPiTechnology/os-configurator-data-iris
-   https://github.com/UniPiTechnology/os-configurator-data-neuron
+- Using these kernel modules requires proper device tree.
+You can find them in their appropriate OSC data repository:
+  - [Unipi Neuron](https://github.com/UniPiTechnology/os-configurator-data-neuron)
+  - [Unipi Patron](https://github.com/UniPiTechnology/os-configurator-data-patron)
+  - [Unipi Iris](https://github.com/UniPiTechnology/os-configurator-data-iris)
+  - [Unipi Edge](https://github.com/UniPiTechnology/os-configurator-data-edge)

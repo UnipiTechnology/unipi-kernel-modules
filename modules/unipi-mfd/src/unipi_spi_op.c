@@ -29,8 +29,8 @@
 
 #define roundup_block(count, blocksize) (1+((count)-1)/(blocksize))
 
-/* bottom part of all async op */
-int unipi_spi_check_message(struct spi_device* spi, struct unipi_spi_context* context)
+/* bottom part of all async op TO BE REMOVED */
+__maybe_unused static int unipi_spi_check_message(struct spi_device* spi, struct unipi_spi_context* context)
 {
 	u16 recv_crc;
 	struct unipi_spi_device *n_spi = spi_get_drvdata(spi);
@@ -173,7 +173,7 @@ static int unipi_spi_parse_frame_write(struct unipi_spi_context* context, struct
 /* upper part of all async opertations
  * - create context with space for 2+add_trans transactions
  * - setup data of first part */
-struct unipi_spi_context *unipi_spi_alloc_context(struct spi_device* spi_dev, enum UNIPI_SPI_OP op, 
+static struct unipi_spi_context *unipi_spi_alloc_context(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
                                                    unsigned int len, unsigned int reg, int add_trans)
 {
 	int trans_count, freq;
@@ -197,7 +197,7 @@ struct unipi_spi_context *unipi_spi_alloc_context(struct spi_device* spi_dev, en
 	s_trans = (struct spi_transfer *)(context + 1);
 	spi_message_init_with_transfers(&context->message, s_trans, trans_count);
 
-	s_trans[0].delay.value = UNIPI_SPI_EDGE_DELAY;
+	s_trans[0].delay.value = n_spi->edge_delay;
 	s_trans[0].delay.unit = SPI_DELAY_UNIT_USECS;
 	s_trans[0].bits_per_word = UNIPI_SPI_B_PER_WORD;
 	s_trans[0].speed_hz = freq;
@@ -225,13 +225,14 @@ struct unipi_spi_context *unipi_spi_alloc_context(struct spi_device* spi_dev, en
  * 		regcount = 1..2   pro WRITEREGS
  *		         = 1..32  pro WRITEBITS
  */ 
-int unipi_spi_write_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
+static int unipi_spi_write_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
                            unsigned int reg, unsigned int count, u8* data,
                            void* cb_data, OperationCallback cb_function)
 {
 	int len;
 	struct unipi_spi_context *context;
 	struct spi_transfer * s_trans;
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 
 	len  = ((op==UNIPI_SPI_OP_WRITEREG)? count : roundup_block(count, 16)) * 2;
 	len += UNIPI_MODBUS_HEADER_SIZE;
@@ -251,7 +252,7 @@ int unipi_spi_write_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
 	unipi_spi_trace_1(spi_dev, "Write(op2) %6phC\n", context->tx_header2);
 
 	s_trans = (struct spi_transfer *)(context + 1);
-	s_trans[1].delay.value = 25;
+	s_trans[1].delay.value = n_spi->internal_delay;
 	s_trans[1].delay.unit = SPI_DELAY_UNIT_USECS;
 
 	s_trans[2].bits_per_word = UNIPI_SPI_B_PER_WORD;
@@ -269,13 +270,14 @@ int unipi_spi_write_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
  * 		regcount = 1..2   pro READREG
  *		         = 1..32  pro READBIT
  */ 
-int unipi_spi_read_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
+static int unipi_spi_read_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
                            unsigned int reg, unsigned int count, u8 *data,
                            void* cb_data, OperationCallback cb_function)
 {
 	int len;
 	struct unipi_spi_context *context;
 	struct spi_transfer * s_trans;
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 
 	len  = ((op==UNIPI_SPI_OP_READREG)? count : roundup_block(count, 16)) * 2;
 	len += UNIPI_MODBUS_HEADER_SIZE;
@@ -286,7 +288,7 @@ int unipi_spi_read_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
 	context->packet_crc = unipi_spi_crc_set(context->tx_header2, len, context->packet_crc);
 
 	s_trans = (struct spi_transfer *)(context + 1);
-	s_trans[1].delay.value = 25;
+	s_trans[1].delay.value = n_spi->internal_delay;
 	s_trans[1].delay.unit = SPI_DELAY_UNIT_USECS;
 
 	s_trans[2].bits_per_word = UNIPI_SPI_B_PER_WORD;
@@ -305,10 +307,11 @@ int unipi_spi_read_simple(struct spi_device* spi_dev, enum UNIPI_SPI_OP op,
 
 
 /*  Async op for READREG */
-int unipi_spi_read_regs_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
+static int unipi_spi_read_regs_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
                               void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) proto_self;
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 	int len, data_trans, remain, i;
 	struct unipi_spi_context *context;
 	struct spi_transfer * s_trans;
@@ -327,7 +330,7 @@ int unipi_spi_read_regs_async(void *proto_self, unsigned int reg, unsigned int c
 	context->packet_crc = unipi_spi_crc_set(data, len, context->packet_crc);
 
 	s_trans = (struct spi_transfer *)(context + 1);
-	s_trans[1].delay.value = 25 + ((count>27)?(count-27):0);
+	s_trans[1].delay.value = n_spi->internal_delay + ((count>27)?(count-27):0);
 	s_trans[1].delay.unit = SPI_DELAY_UNIT_USECS;
 
 	s_trans[2].bits_per_word = UNIPI_SPI_B_PER_WORD;
@@ -353,10 +356,11 @@ int unipi_spi_read_regs_async(void *proto_self, unsigned int reg, unsigned int c
 }
 
 /*  Async op for WRITEREG */
-int unipi_spi_write_regs_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
+static int unipi_spi_write_regs_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
                                void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) proto_self;
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 	int len, remain, i, data_trans;
 	struct unipi_spi_context *context;
 	struct spi_transfer * s_trans;
@@ -378,7 +382,7 @@ int unipi_spi_write_regs_async(void *proto_self, unsigned int reg, unsigned int 
 	context->packet_crc = unipi_spi_crc_set(data, len, context->packet_crc);
 
 	s_trans = (struct spi_transfer *)(context + 1);
-	s_trans[1].delay.value = 25;
+	s_trans[1].delay.value = n_spi->internal_delay;
 	s_trans[1].delay.unit = SPI_DELAY_UNIT_USECS;
 
 	s_trans[2].bits_per_word = UNIPI_SPI_B_PER_WORD;
@@ -401,13 +405,14 @@ int unipi_spi_write_regs_async(void *proto_self, unsigned int reg, unsigned int 
 	return unipi_spi_exec_context(spi_dev, context, cb_data, cb_function);
 }
 
-int unipi_spi_write_str_async(void* spi, unsigned int port, u8* data, unsigned int count, 
+static int unipi_spi_write_str_async(void* spi, unsigned int port, u8* data, unsigned int count,
                               void* cb_data, OperationCallback cb_function)
 {
 	int len, data_trans, i, remain;
 	struct unipi_spi_context *context;
 	struct spi_transfer * s_trans;
 	struct spi_device* spi_dev = (struct spi_device*) spi;
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 
 	if (count == 1) {
 		context = unipi_spi_alloc_context(spi_dev, UNIPI_SPI_OP_WRITECHAR, data[0], port << 8, 0);
@@ -424,7 +429,7 @@ int unipi_spi_write_str_async(void* spi, unsigned int port, u8* data, unsigned i
 	context->packet_crc = unipi_spi_crc_set(data, len, context->packet_crc);
 
 	s_trans = (struct spi_transfer *)(context + 1);
-	s_trans[1].delay.value = 25;
+	s_trans[1].delay.value = n_spi->internal_delay;
 	s_trans[1].delay.unit = SPI_DELAY_UNIT_USECS;
 
 	remain = len + UNIPI_SPI_CRC_LENGTH;
@@ -441,13 +446,14 @@ int unipi_spi_write_str_async(void* spi, unsigned int port, u8* data, unsigned i
 	return unipi_spi_exec_context(spi_dev, context, cb_data, cb_function);
 }
 
-int unipi_spi_read_str_async(void* spi, unsigned int port, u8* data, unsigned int count, 
+static int unipi_spi_read_str_async(void* spi, unsigned int port, u8* data, unsigned int count,
                              void* cb_data, OperationCallback cb_function)
 {
 	int len, data_trans, i, remain;
 	struct unipi_spi_context *context;
 	struct spi_transfer * s_trans;
 	struct spi_device* spi_dev = (struct spi_device*) spi;
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 
 	len = count;
 	if (len < 246) {
@@ -468,7 +474,7 @@ int unipi_spi_read_str_async(void* spi, unsigned int port, u8* data, unsigned in
 	context->packet_crc = unipi_spi_crc_set(data, len, context->packet_crc);
 
 	s_trans = (struct spi_transfer *)(context + 1);
-	s_trans[1].delay.value = 25;
+	s_trans[1].delay.value = n_spi->internal_delay;
 	s_trans[1].delay.unit = SPI_DELAY_UNIT_USECS;
 
 	s_trans[2].bits_per_word = UNIPI_SPI_B_PER_WORD;
@@ -495,7 +501,7 @@ int unipi_spi_read_str_async(void* spi, unsigned int port, u8* data, unsigned in
 
 
 /*  Async op for WRITEBIT */
-int unipi_spi_write_bits_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
+static int unipi_spi_write_bits_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
                               void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) proto_self;
@@ -513,7 +519,7 @@ int unipi_spi_write_bits_async(void *proto_self, unsigned int reg, unsigned int 
 }
 
 /*  Async op for READBIT */
-int unipi_spi_read_bits_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
+static int unipi_spi_read_bits_async(void *proto_self, unsigned int reg, unsigned int count, u8* data,
                               void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) proto_self;
@@ -524,7 +530,7 @@ int unipi_spi_read_bits_async(void *proto_self, unsigned int reg, unsigned int c
 }
 
 
-int unipi_spi_idle_op_async(void* self, void* cb_data, OperationCallback cb_function)
+static int unipi_spi_idle_op_async(void* self, void* cb_data, OperationCallback cb_function)
 {
 	struct spi_device* spi_dev = (struct spi_device*) self;
 	struct unipi_spi_context *context;

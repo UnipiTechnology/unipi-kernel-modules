@@ -2,7 +2,7 @@ Source: unipi-kernel-modules
 Section: kernel
 Priority: optional
 Maintainer: Miroslav Ondra <info@unipi.technology>
-Build-Depends: debhelper (>= 9)
+Build-Depends: debhelper-compat (= 10)
 Standards-Version: 3.9.8
 Homepage: https://www.unipi.technology/
 Vcs-Git: https://git.unipi.technology/UniPi/unipi-kernel.git
@@ -14,10 +14,10 @@ Depends: ${misc:Depends}, dkms, ${unipi:Depends}
 Suggests: ${unipi:Suggests}
 Replaces: neuron-kernel, unipi-kernel-modules
 Conflicts: neuron-kernel, unipi-kernel-modules
-Breaks: unipi-os-configurator (<= 0.36)
-Description: UniPi Neuron/Axon kernel modules - DKMS source
+Breaks: unipi-os-configurator (<= 0.36), unipi-lte (<= 0.58)
+Description: Unipi kernel modules - DKMS source
  This package contains source code of kernel module for spi protocol 
- used by internal boards in the UniPi Neuron/Axon controllers.
+ used by internal boards in the Unipi controllers.
  Can be used with DKMS so that local kernel images are automatically
  built and installed every time relevant kernel packages are upgraded.
 

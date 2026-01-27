@@ -33,4 +33,18 @@
 {% endfor %}
 {% endfor %}
 
+
+struct uniee_map {
+  int index;
+  const char *name;
+};
+
+/* specdata_header_t.field_type */
+#define UNIEE_FIELD_TYPE_MAP {\
+{% for t,v in field.type.items() %} { {{v}},"{{t|upper}}" },\
+{% endfor -%}
+}
+
+#define DIM(x) (sizeof(x)/sizeof(*(x)))
+
 #endif

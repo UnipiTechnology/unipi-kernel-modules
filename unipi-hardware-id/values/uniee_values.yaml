@@ -7,7 +7,7 @@ platform:
         G1XX:    0x2
         NEURON:  0x3
         AXON:    0x5
-        CM40:    0x6
+        EDGE:    0x6
         PATRON:  0x7
         IRIS:    0xF
         OEM:     0x10
@@ -28,7 +28,7 @@ platform:
         IRISx7:  0x040F
         IRISx21: 0x050F
         IRISx71: 0x060F
- 
+
         # IRIS card sold separately as product
         IRIS_CARD: 0xCA0F
 
@@ -64,14 +64,23 @@ platform:
         M567: 0x0907
         S167: 0x0a07
         S227: 0x0b07
+        AKUZU1: 0x0c07
+        S167_2: 0x0d07
+        M267_2: 0x0e07
+        M567_2: 0x0f07
+
+        # Edge
+        AKUSO1: 0x0106
+        E10100_PROTOTYP: 0x0206
+        E410: 0x0306
+        E411: 0x0406
+        E412: 0x0506
+        E413: 0x0606
 
         # OEM Specials
-        AKUZU1: 0x0c07
-        
         ACHE1: 0x0110
         ACHE2: 0x0210
 
-        AKUSO1: 0x0106
 
 # uniee_bank_2_t.board_model
 board:
@@ -119,6 +128,19 @@ board:
         IC_LoRaNode_2:    127
         IC_Zigbee_1:      128
 
+# Edge boards
+
+        UDELAB0101:        200
+        UDELAB0102:        201
+        UDELAB0202:        202
+        UDELAB0302:        203
+        UDELAB0402:        204
+
+        UDEUAB0102:        221
+        UDEUAB0202:        222
+        UDEUAB0302:        223
+
+
 # OEM (external vendor) Iris cards
 
         IC_IQRF_1:            1000
@@ -141,11 +163,14 @@ field:
         MAC:    6
         AICAL:  7
         MAC1:   8
+        MODEM:  9
+        MODEL:  10
     value:
         button:
             PATRON: 0
             IRIS:   1
-            CM40:   2
+            NEURON: 2
+            EDGE:   3
 # values of fields stored in uniee_bank_1_t.dummy_data */
 # /* Altboot BUTTON on Zulu based motherboars
 #        0 - button is connected to dedicated gpio

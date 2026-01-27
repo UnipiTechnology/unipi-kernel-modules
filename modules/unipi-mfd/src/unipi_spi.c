@@ -28,6 +28,9 @@ extern struct unipi_protocol_op spi_op_v1;
 extern struct unipi_protocol_op spi_op_v2;
 #define UNIPI_MFD_COIL_PROTOCOL_MODE 1007
 
+struct unipi_channel* unipi_spi_get_channel(struct spi_device* spi_dev);
+
+
 static ssize_t messages_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct spi_device *spi = container_of(dev, struct spi_device, dev);
@@ -138,6 +141,45 @@ static ssize_t hmode_store(struct device *dev, struct device_attribute *attr, co
 	return count;
 }
 
+static ssize_t edge_delay_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct spi_device *spi = container_of(dev, struct spi_device, dev);
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi);
+	ssize_t len;
+	len = sprintf(buf, "%u", n_spi->edge_delay);
+	return len;
+}
+static ssize_t edge_delay_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct spi_device *spi = container_of(dev, struct spi_device, dev);
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi);
+	unsigned int val = 0;
+	if (kstrtouint(buf, 0, &val) >= 0) {
+		n_spi->edge_delay = val;
+	}
+	return count;
+}
+
+static ssize_t internal_delay_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct spi_device *spi = container_of(dev, struct spi_device, dev);
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi);
+	ssize_t len;
+	len = sprintf(buf, "%u", n_spi->internal_delay);
+	return len;
+}
+static ssize_t internal_delay_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct spi_device *spi = container_of(dev, struct spi_device, dev);
+	struct unipi_spi_device *n_spi = spi_get_drvdata(spi);
+	unsigned int val = 0;
+	if (kstrtouint(buf, 0, &val) >= 0) {
+		n_spi->internal_delay = val;
+	}
+	return count;
+}
+
+
 DEVICE_ATTR_RO(messages);
 DEVICE_ATTR_RO(errors_tx);
 DEVICE_ATTR_RO(bytes);
@@ -149,6 +191,8 @@ DEVICE_ATTR_RO(errors_opcode1);
 DEVICE_ATTR_RW(frequency);
 DEVICE_ATTR_RW(hmode);
 DEVICE_ATTR_RO(firmware_in_progress);
+DEVICE_ATTR_RW(edge_delay);
+DEVICE_ATTR_RW(internal_delay);
 
 static struct attribute *unipi_spi2_attrs[] = {
     &dev_attr_messages.attr,
@@ -169,6 +213,8 @@ static struct attribute *unipi_spi1_attrs[] = {
     &dev_attr_frequency.attr,
     &dev_attr_firmware_in_progress.attr,
     &dev_attr_hmode.attr,
+    &dev_attr_edge_delay.attr,
+    &dev_attr_internal_delay.attr,
 	NULL,
 };
 static const struct attribute_group unipi_spi1_group = {
@@ -193,6 +239,9 @@ int unipi_spi_set_v1(struct spi_device* spi_dev)
 {
 	struct unipi_spi_device *n_spi = spi_get_drvdata(spi_dev);
 	u16 data = 0x0;
+
+	if (n_spi->hmode == 0)
+		return 0;
 
 	if (n_spi->channel.op->write_bits_async(spi_dev, 1007, 1, (u8*)&data, NULL, NULL) == 0) {
 		n_spi->hmode = 0;
@@ -243,14 +292,13 @@ int unipi_spi_try_v2(struct spi_device* spi_dev)
 	return 0;
 }
 
-void unipi_spi_check_busy_queue(struct unipi_spi_device* n_spi)
+static void unipi_spi_check_busy_queue(struct unipi_spi_device* n_spi)
 {
+	/* n_spi->busy-lock is held */
 	struct spi_message *msg;
 	struct unipi_spi_context* context;
-	//unsigned long flags;
 	int ret;
 
-	//spin_lock_irqsave(&n_spi->busy_lock, flags);
 	while (!list_empty(&n_spi->queue)) {
 		unipi_spi_trace(n_spi->spi_dev, "Remove from busyqueue\n");
 		/* Extract head of queue and try to insert into spi_async queue*/
@@ -258,6 +306,14 @@ void unipi_spi_check_busy_queue(struct unipi_spi_device* n_spi)
 		list_del_init(&msg->queue);
 		context = ((container_of((msg), struct unipi_spi_context, message)));
 		ret = spi_async(n_spi->spi_dev, msg);
+		if (ret == -EBUSY) {
+			context->busy_repeat++;
+			if (context->busy_repeat < UNIPI_SPI_BUSY_REPEAT_COUNT) {
+				list_add(&context->message.queue, &n_spi->queue);
+				hrtimer_start_range_ns(&n_spi->frame_timer, UNIPI_SPI_BUSY_REPEAT_NS, 5000, HRTIMER_MODE_REL);
+				return;
+			}
+		}
 		if (ret != 0) {
 			/* if error -> inform caller by callback and try next */
 			if (context->operation_callback) 
@@ -269,12 +325,11 @@ void unipi_spi_check_busy_queue(struct unipi_spi_device* n_spi)
 		}
 	}
 	n_spi->busy = 0;
-	//spin_unlock_irqrestore(&n_spi->busy_lock, flags);
 }
 
 /* callback of inter-frame timer. Try to insert waiting messages from n_spi->queue */
 
-enum hrtimer_restart unipi_spi_timer_func(struct hrtimer *timer)
+static enum hrtimer_restart unipi_spi_timer_func(struct hrtimer *timer)
 {
 	struct unipi_spi_device* n_spi = ((container_of((timer), struct unipi_spi_device, frame_timer)));
 	unsigned long flags;
@@ -392,9 +447,22 @@ int unipi_spi_exec_context(struct spi_device* spi_dev, struct unipi_spi_context 
 	}
 	if (context->interframe_nsec)
 		n_spi->busy = 1;
-	spin_unlock_irqrestore(&n_spi->busy_lock, bflags);
+//	spin_unlock_irqrestore(&n_spi->busy_lock, bflags);
 
 	ret = spi_async(spi_dev, &context->message);
+	if (ret) {
+		if (ret == -EBUSY) {
+			list_add_tail(&context->message.queue, &n_spi->queue);
+			context->busy_repeat++;
+			n_spi->stat.errors_tx++;
+			hrtimer_start_range_ns(&n_spi->frame_timer, UNIPI_SPI_BUSY_REPEAT_NS, 5000, HRTIMER_MODE_REL);
+			unipi_spi_trace(spi_dev, "Busy. repeat request txopcode:%d\n", context->tx_header[0]);
+			ret = 0;
+		} else {
+			n_spi->busy = 0;
+		}
+	}
+	spin_unlock_irqrestore(&n_spi->busy_lock, bflags);
 	spin_unlock_irqrestore(&n_spi->firmware_lock, flags);
 	if (ret != 0) {
 		n_spi->stat.errors_tx++;
@@ -412,7 +480,7 @@ void unipi_spi_populated(void * self)
 }
 
 
-int unipi_spi_probe(struct spi_device *spi)
+static int unipi_spi_probe(struct spi_device *spi)
 {
 	struct unipi_spi_device *n_spi;
 //	u16  first_probe[8];
@@ -461,6 +529,8 @@ int unipi_spi_probe(struct spi_device *spi)
 	n_spi->firmware_in_progress = 0;
 	n_spi->frequency = UNIPI_SPI_PROBE_FREQ;
 	n_spi->probe_mode = 1;
+	n_spi->edge_delay = UNIPI_SPI_EDGE_DELAY;
+	n_spi->internal_delay = UNIPI_SPI_INTERNAL_DELAY;
 
 	INIT_LIST_HEAD(&n_spi->queue);
 	spin_lock_init(&n_spi->busy_lock);
@@ -472,8 +542,14 @@ int unipi_spi_probe(struct spi_device *spi)
 
 	unipi_spi_trace(spi, "Max Hz controller=%d device=%d\n", spi->master->max_speed_hz, spi->max_speed_hz);
 	if (spi->dev.of_node) {
+		u32 _val = 0;
 		of_property_read_u32(spi->dev.of_node, "probe-always-succeeds", &(probe_always_succeeds));
 		of_property_read_u32(spi->dev.of_node, "allow-protocol-v2", &(allow_v2));
+		of_property_read_u32(spi->dev.of_node, "edge-delay", &(_val));
+		if (_val) n_spi->edge_delay = _val;
+		_val = 0;
+		of_property_read_u32(spi->dev.of_node, "internal-delay", &(_val));
+		if (_val) n_spi->internal_delay = _val;
 	} else {
 		probe_always_succeeds = 1;
 	}
@@ -546,9 +622,9 @@ int unipi_spi_probe(struct spi_device *spi)
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
-int unipi_spi_remove(struct spi_device *spi)
+static int unipi_spi_remove(struct spi_device *spi)
 #else
-void unipi_spi_remove(struct spi_device *spi)
+static void unipi_spi_remove(struct spi_device *spi)
 #endif
 {
 	struct unipi_spi_device *n_spi = spi_get_drvdata(spi);

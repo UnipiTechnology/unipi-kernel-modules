@@ -1,5 +1,5 @@
 /*
- * UniPi PLC device driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC device driver - Copyright (C) 2024 Unipi Technology
  * Author: Tomas Knot <tomasknot@gmail.com>
  *
  *  Based on the SC16IS7xx driver by Jon Ringle <jringle@gridpoint.com>,
@@ -52,13 +52,17 @@ enum UNIPI_SPI_OP
 
 
 #define UNIPI_SPI_EDGE_DELAY			10
+#define UNIPI_SPI_INTERNAL_DELAY		25
 #define UNIPI_SPI_B_PER_WORD 			8
 #define UNIPI_SPI_INTER_FRAME_US		40
 #define UNIPI_SPI_INTER_FRAME_NS		(UNIPI_SPI_INTER_FRAME_US*1000)
+#define UNIPI_SPI2_EDGE_DELAY			4
 
 #define UNIPI_SPI_PROBE_FREQ			1000000
 #define UNIPI_SPI_SLOWER_FREQ			6000000
 
+#define UNIPI_SPI_BUSY_REPEAT_NS		100000
+#define UNIPI_SPI_BUSY_REPEAT_COUNT		6
 
 /* On some spi controller (BCM) don't work correctly long transfers 
  * this number defines maximum length of one chunk */
@@ -117,6 +121,8 @@ struct unipi_spi_device
 	int enable_v2;
 	int allow_v2;
 	int probe_mode;
+	uint16_t edge_delay;
+	uint16_t internal_delay;
 };
 
 struct unipi_spi_devstatus {
@@ -146,6 +152,7 @@ struct unipi_spi_context
 	u8* data;
 	int len;
 	u16 packet_crc;
+	int busy_repeat;
 	union {
 		u8 tx_header[UNIPI_SPI2_MESSAGE_ALLOC];
 		struct {

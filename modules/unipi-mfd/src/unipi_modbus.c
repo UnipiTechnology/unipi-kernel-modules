@@ -1,5 +1,5 @@
 /*
- * UniPi PLC modbus channel driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC modbus channel driver - Copyright (C) 2024 Unipi Technology
  * 
  * Author: Tomas Knot <tomasknot@gmail.com>
  * Author: Miroslav Ondra <ondra@faster.cz>
@@ -108,7 +108,7 @@ EXPORT_SYMBOL_GPL(unipi_modbus_classdev_unregister);
 /*****************************************************************
  *  Modbus like Interface via /dev/unipimodbus%d
  */
-int unipi_modbus_open (struct inode *inode_p, struct file *file_p)
+static int unipi_modbus_open (struct inode *inode_p, struct file *file_p)
 {
 	struct unipi_modbus_file_data *private_data;
 	int modbus_address = iminor(inode_p);
@@ -130,7 +130,7 @@ int unipi_modbus_open (struct inode *inode_p, struct file *file_p)
 	return 0;
 }
 
-int unipi_modbus_release (struct inode *inode_p, struct file *file_p)
+static int unipi_modbus_release (struct inode *inode_p, struct file *file_p)
 {
 	struct unipi_modbus_file_data *private_data;
 	if (file_p == NULL) {
@@ -170,7 +170,7 @@ static __poll_t unipi_modbus_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
-ssize_t unipi_modbus_read (struct file *file_p, char *buffer, size_t len, loff_t *offset)
+static ssize_t unipi_modbus_read (struct file *file_p, char *buffer, size_t len, loff_t *offset)
 {
 	s32 result = 0;
 	loff_t dummy_offset = 0;
@@ -216,7 +216,7 @@ unlock:
 	return result;
 }
 
-void unipi_modbus_op_callback(void* cb_data, int result)
+static void unipi_modbus_op_callback(void* cb_data, int result)
 {
 	struct unipi_modbus_file_data *private_data = (struct unipi_modbus_file_data*) cb_data;
 	if (cb_data) {
@@ -226,7 +226,7 @@ void unipi_modbus_op_callback(void* cb_data, int result)
 	}
 }
 
-ssize_t unipi_modbus_write (struct file *file_p, const char *buffer, size_t len, loff_t *w_offset)
+static ssize_t unipi_modbus_write (struct file *file_p, const char *buffer, size_t len, loff_t *w_offset)
 {
     loff_t dummy_offset = 0;
 	struct unipi_modbus_file_data *private_data;
@@ -267,7 +267,13 @@ ssize_t unipi_modbus_write (struct file *file_p, const char *buffer, size_t len,
 	}
 	private_data->status = UNIPI_MODBUS_STATUS_INOP;
 	private_data->recv_buf[0] = 0;
-	op = buffer[0]; count = buffer[1]; reg = buffer[2] | (buffer[3] << 8);
+
+	uint8_t kbuf[4];
+	if (copy_from_user(kbuf, buffer, sizeof(kbuf)) != 0) {
+		ret = -EFAULT;
+		goto unlock;
+	}
+	op = kbuf[0]; count = kbuf[1]; reg = kbuf[2] | (kbuf[3] << 8);
 	//printk("op=%d count=%d reg=%d", op, count, reg);
 	switch (op) {
 		case UNIPI_MODBUS_OP_READREG:
@@ -317,12 +323,16 @@ unlock:
 }
 
 
-int unipi_modbus_lock (struct file *file_p, int cmd, struct file_lock *flock)
+static int unipi_modbus_lock (struct file *file_p, int cmd, struct file_lock *flock)
 {
 	/* cmd set_of(F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW) */
 	struct unipi_modbus_file_data *private_data;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,9,0)
 	if (flock->fl_type == F_UNLCK) {
+#else
+	if (lock_is_unlock(flock)) {
+#endif
 		// Unlock device
 		private_data = (struct unipi_modbus_file_data*) file_p->private_data;
 		mutex_lock(&(private_data->lock));
@@ -331,7 +341,11 @@ int unipi_modbus_lock (struct file *file_p, int cmd, struct file_lock *flock)
 		private_data->is_locked = 0;
 		mutex_unlock(&(private_data->lock));
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,9,0)
 	} else if ((flock->fl_type == F_WRLCK)||(flock->fl_type == F_RDLCK)||(flock->fl_type == F_EXLCK)) {
+#else
+	} else if (lock_is_read(flock) || lock_is_write(flock) || (flock->c.flc_type == F_EXLCK)) {
+#endif
 		// Lock device
 		private_data = (struct unipi_modbus_file_data*) file_p->private_data;
 		mutex_lock(&(private_data->lock));
@@ -356,7 +370,7 @@ struct file_operations file_ops =
 };
 
 
-int __init unipi_modbus_init(void)
+static int __init unipi_modbus_init(void)
 {
 	int major, rc = 0;
 
@@ -387,7 +401,7 @@ err_class:
 	return rc;
 }
 
-void __exit unipi_modbus_exit(void)
+static void __exit unipi_modbus_exit(void)
 {
 	class_destroy(unipi_modbus_class); 
 	unregister_chrdev(unipi_modbus_major, UNIPI_MODBUS_DEVICE_NAME);

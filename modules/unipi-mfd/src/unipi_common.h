@@ -1,5 +1,5 @@
 /*
- * UniPi PLC device driver - Copyright (C) 2018 UniPi Technology
+ * Unipi PLC device driver - Copyright (C) 2024 Unipi Technology
  * Author: Tomas Knot <tomasknot@gmail.com>
  *
  *  Based on the SC16IS7xx driver by Jon Ringle <jringle@gridpoint.com>,
@@ -32,6 +32,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/serial_core.h>
 #include <linux/serial.h>
@@ -47,7 +49,7 @@
  * Definitions *
  ***************/
 
-#define UNIPI_MODULE_MAJOR_VERSIONSTRING "2.52:2024:04:26"
+#define UNIPI_MODULE_MAJOR_VERSIONSTRING "2.74:2025:03:06"
 
 #define UNIPI_SPI_DETAILED_DEBUG    0
 #define UNIPI_MODBUS_DETAILED_DEBUG 0

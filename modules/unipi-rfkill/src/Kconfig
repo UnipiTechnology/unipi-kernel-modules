@@ -1,0 +1,13 @@
+config UNIPI_RFKILL
+	tristate "Rfkill support for LTE modems"
+	default m
+	help
+	    Rfkill module to support KTE modems installed on Unipi controllers
+	    Module has name unipi-rfkill
+
+config UNIPI_CONSUMER
+	tristate "Helper to support switching off regulator"
+	default m
+	help
+	    Rewritten consumer.c to support device tree
+

@@ -37,7 +37,7 @@
 #define unipi_fw_error(spi, f, args...)	dev_err(&spi->dev, f, ##args)
 
 
-struct spi_message * unipi_spi_setup_message(struct spi_device* spi_dev,
+static struct spi_message * unipi_spi_setup_message(struct spi_device* spi_dev,
                                              u8* send_buf, u8* recv_buf, int len)
 {
 	struct spi_transfer * s_trans;
@@ -59,7 +59,7 @@ struct spi_message * unipi_spi_setup_message(struct spi_device* spi_dev,
 	s_trans = (struct spi_transfer *)(message + 1);
 	spi_message_init_with_transfers(message, s_trans, trans_count);
 
-	s_trans[0].delay.value = UNIPI_SPI_EDGE_DELAY;
+	s_trans[0].delay.value = n_spi->edge_delay;
 	s_trans[0].delay.unit = SPI_DELAY_UNIT_USECS;
 	s_trans[0].bits_per_word = UNIPI_SPI_B_PER_WORD;
 	s_trans[0].speed_hz = freq;
