@@ -1,7 +1,0 @@
-config UNIPI_ID
-	tristate "Unipi-id nvmem parser"
-	default m
-	help
-	    Parse Eprom to identify Unipi controller and modules
-	    Module has name unipi-id
-

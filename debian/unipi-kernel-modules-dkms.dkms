@@ -6,8 +6,6 @@ PACKAGE_VERSION="MODULE_VERSION#"
 AUTOINSTALL=yes
 # Deprecated feature REMAKE_INITRD=yes
 
-MAKE[0]="make -C $kernel_source_dir M=${dkms_tree}/unipi/${module_version}/build/unipi-id modules;\
-	make -C $kernel_source_dir M=${dkms_tree}/unipi/${module_version}/build/rtc-unipi modules;\
-	make -C $kernel_source_dir M=${dkms_tree}/unipi/${module_version}/build/unipi-rfkill modules;\
+MAKE[0]="make -C $kernel_source_dir M=${dkms_tree}/unipi/${module_version}/build/unipi-rfkill modules;\
 	make -C $kernel_source_dir M=${dkms_tree}/unipi/${module_version}/build/unipi-mfd modules"
 CLEAN="make -C ${dkms_tree}/unipi/${module_version} clean; rm -rf ${dkms_tree}/unipi/${module_version}/build/{Module.*,modules.order,OBJ.*}"

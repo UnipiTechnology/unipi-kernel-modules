@@ -1,9 +1,0 @@
-*.mod
-*.mod.c
-.*.cmd
-*.d
-*.dtb
-*.tmp
-modules.order
-Module.symvers
-

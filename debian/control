@@ -14,7 +14,7 @@ Depends: ${misc:Depends}, dkms, ${unipi:Depends}
 Suggests: ${unipi:Suggests}
 Replaces: neuron-kernel, unipi-kernel-modules
 Conflicts: neuron-kernel, unipi-kernel-modules
-Breaks: unipi-os-configurator (<= 0.36), unipi-lte (<= 0.58)
+Breaks: unipi-os-configurator (<= 0.82), unipi-lte (<= 0.58)
 Description: Unipi kernel modules - DKMS source
  This package contains source code of kernel module for spi protocol 
  used by internal boards in the Unipi controllers.

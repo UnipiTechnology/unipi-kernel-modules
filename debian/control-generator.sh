@@ -137,7 +137,7 @@ else
 fi
 
 replaces=${breaks}
-breaks="unipi-os-configurator (<= 0.36)"
+breaks="unipi-os-configurator (<= 0.82)"
 [ -n "${replaces}" ] && breaks="${breaks}, ${replaces}"
 
 cat >>debian/control <<EOF

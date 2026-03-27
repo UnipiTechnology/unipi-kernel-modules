@@ -549,33 +549,6 @@ static void unipi_mfd_int_status_callback(void* self, u8 int_status)
 	}
 }
 
-
-/*
-	unipi_dev = bus_find_device(&platform_bus_type, NULL, NULL, device_match_unipi_id);
-	if (unipi_dev) {
-		struct unipi_id_data *unipi_id = dev_get_platdata(unipi_dev);
-		dev_info(dev, "Found PLC %s Model: %.6s\n",  unipi_id_get_family_name(unipi_id), unipi_id->descriptor.product_info.model_str);
-		put_device(unipi_dev);
-	} else {
-		return  -EPROBE_DEFER;
-	}
-
-	struct kernfs_node *value_kn;
-
-	data->value_kn = sysfs_get_dirent(unipi_dev->kobj.sd, "unipi_id");
-	sysfs_notify_dirent(data->value_kn);
-
-	sysfs_put(data->value_kn);
-
-****
-		nfit_kernfs = sysfs_get_dirent(nvdimm_kobj(nvdimm)->sd, "nfit");
-		if (nfit_kernfs)
-			nfit_mem->flags_attr = sysfs_get_dirent(nfit_kernfs,
-					"flags");
-		sysfs_put(nfit_kernfs);
-
-*/
-
 #define MAX_ALLOWED_FW 32
 static int unipi_mfd_find_variant(struct device *dev, struct device_node *node, u16 fw_variant)
 {
