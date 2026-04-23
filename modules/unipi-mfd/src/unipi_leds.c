@@ -8,6 +8,7 @@
 
 #include <linux/io.h>
 #include <linux/init.h>
+#include <linux/jiffies.h>
 #include <linux/of_device.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
@@ -20,11 +21,14 @@
 #include "unipi_common.h"
 #include "unipi_mfd.h"
 
+#define FORCE_REFRESH_MSEC 10000
+
 struct unipi_led {
 	struct led_classdev cdev;
 	struct regmap *map;
 	u32    reg;
 	bool   state;
+	unsigned long timeout;
 	char   name[32];
 };
 
@@ -34,13 +38,19 @@ static int unipi_led_set(struct led_classdev *led_cdev,
 	struct unipi_led *uled =
 		container_of(led_cdev, struct unipi_led, cdev);
 	u32 val;
+	bool state;
 	int ret;
 
 	val = (value != LED_OFF);
-	uled->state = val ? true : false;
-	ret = regmap_write_async(uled->map, uled->reg, val);
-	if (ret < 0)
-		dev_err(uled->cdev.dev, "error updating LED status\n");
+	state = val ? true : false;
+	if (uled->state != state || time_after(jiffies, uled->timeout)) {
+		uled->timeout = jiffies + msecs_to_jiffies(FORCE_REFRESH_MSEC);
+		ret = regmap_write_async(uled->map, uled->reg, val);
+		if (ret < 0)
+			dev_err(uled->cdev.dev, "error updating LED status\n");
+		else
+			uled->state = state;
+	}
 	return ret;
 }
 
