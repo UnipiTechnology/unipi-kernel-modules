@@ -513,8 +513,12 @@ int unipi_mfd_enable_interrupt(struct unipi_iogroup_device *iogroup, u16 mask)
 		iogroup->poll_enabled = (mask != 0);
 		if (iogroup->poll_enabled) {
 			if ((iogroup->poll_timer.function == NULL)) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,13,0)
 				hrtimer_init(&iogroup->poll_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 				iogroup->poll_timer.function = unipi_mfd_poll_timer_func;
+#else
+				hrtimer_setup(&iogroup->poll_timer, unipi_mfd_poll_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+#endif
 			}
 			hrtimer_start_range_ns(&iogroup->poll_timer, 2000000, 4000000, HRTIMER_MODE_REL);
 		} else {

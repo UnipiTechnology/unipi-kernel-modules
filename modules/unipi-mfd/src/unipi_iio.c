@@ -286,14 +286,10 @@ static int unipi_iio_ai_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec
 		raw_value = 0;
 		regmap_bulk_read(iio_platform->map, n_iio->raw_valreg, &raw_value, iio_platform->descriptor->raw_valsize);
 		*val = raw_value;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
 		if (iio_platform->descriptor->raw_valsize == 1)
 			return IIO_VAL_INT;
 		*val2 = 0;
 		return IIO_VAL_INT_64;
-#else
-		return IIO_VAL_INT;
-#endif
 	}
 
 	regmap_bulk_read(iio_platform->map, n_iio->valreg, &float_as_u32, AI_VAL_REG_COUNT);
@@ -532,9 +528,6 @@ static int unipi_iio_probe(struct platform_device *pdev)
 	for (i = 0; i < iio_platform->io_count; i++) {
 		iio_dev = devm_iio_device_alloc(dev, sizeof(struct unipi_iio_device));
 		iio_dev->modes = INDIO_DIRECT_MODE;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,19,0)
-		iio_dev->currentmode = INDIO_DIRECT_MODE;
-#endif
 		iio_dev->name = "aio_type_unipi";
 		iio_dev->dev.parent = dev;
 		dev_set_name(&iio_dev->dev, iio_platform->descriptor->fname, iogroup->address,  i + 1);

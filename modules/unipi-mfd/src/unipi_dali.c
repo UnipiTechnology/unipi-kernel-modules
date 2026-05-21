@@ -162,11 +162,7 @@ static void unipi_dali_config_port(struct uart_port *port, int flags)
  * Non-static Functions *
  ************************/
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,0)
-static void unipi_dali_set_termios(struct uart_port *port, struct ktermios *termios, struct ktermios *old)
-#else
 static void unipi_dali_set_termios(struct uart_port *port, struct ktermios *termios, const struct ktermios *old)
-#endif
 {
 //	struct unipi_uart_port *n_port = to_unipi_dali_port(port, port);
 /*
@@ -664,8 +660,12 @@ static int unipi_dali_port_probe(struct device *dev, struct unipi_dali_device *n
 	spin_lock_init(&port->txop_lock);
 //	port->tx_fifo_len = 0x7fff; //set it to big number; invoke reading current value from MFD
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,13,0)
 	hrtimer_init(&port->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	port->timer.function = unipi_dali_timer_func;
+#else
+	hrtimer_setup(&port->timer, unipi_dali_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+#endif
 
 	ret = uart_add_one_port(&unipi_dali_uart_driver, &port->port);
 	if (ret) {

@@ -64,6 +64,7 @@ static int unipi_gpio_get(struct gpio_chip *chip, unsigned offset)
 	return !!(val & BIT(offset & unipi_gpiochip->data->to_bit_mask));
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,18,0)
 static void unipi_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 {
 	/* using coils to update */
@@ -72,7 +73,16 @@ static void unipi_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 
 	regmap_write(unipi_gpiochip->map, unipi_gpiochip->value_reg + offset, !!val);
 }
+#else
+static int unipi_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+{
+	/* using coils to update */
+	struct unipi_gpiochip_device *unipi_gpiochip = gpiochip_get_data(chip);
+	//printk("gpio set %d, %d", offset, val);
 
+	return regmap_write(unipi_gpiochip->map, unipi_gpiochip->value_reg + offset, !!val);
+}
+#endif
 /* ToDo
 static void unipi_gpio_set_multiple(struct gpio_chip *chip, unsigned long *mask, unsigned long *bits)
 {

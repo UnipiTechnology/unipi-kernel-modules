@@ -15,7 +15,7 @@ if [ -z "${PRODUCT}" ]; then
     ################## dkms #################333
     BINARY_PKG_NAME=unipi-kernel-modules-dkms
     unset pre_depends
-    depends="raspberrypi-kernel-headers | unipi-kernel-headers, unipi-os-configurator-data"
+    depends="raspberrypi-kernel-headers | unipi-kernel-headers | linux-headers-rpi-v8 | linux-headers-rpi-2712, unipi-os-configurator-data"
     unset suggests
     cat >debian/rules.in <<EOF
 %:
@@ -81,13 +81,15 @@ fi
 
 
 if [ "${PRODUCT}" = "neuron" ] || [ "${PRODUCT}" = "unipi1" ] ; then
-    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
+    #PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
+    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | sed 's/^.*\(linux-headers-\)/\1/;s/,.*//')"
     # in raspberrypi-kernel-headers can be more than one kernels for different SoC
     LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/usr\/lib\/modules\/.*-v7.*\/build$/p'))
     LINUX_DIR_PATH="${LINUX_DIR_ARR[*]}"
 
 elif [ "${PRODUCT}" = "neuron64" ] || [ "${PRODUCT}" = "unipi1x64" ] ; then
-    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
+    #PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
+    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | sed 's/^.*\(linux-headers-\)/\1/;s/,.*//')"
     LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/usr\/lib\/modules\/.*\/build$/p'))
     LINUX_DIR_PATH="${LINUX_DIR_ARR[*]}"
 

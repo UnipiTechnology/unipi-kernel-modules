@@ -488,11 +488,6 @@ static int unipi_spi_probe(struct spi_device *spi)
 	int ret, i;   //, degraded=0; //, no_irq = 0;
 	u32 probe_always_succeeds = 0;
 	u32 allow_v2 = 0;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,13,0)
-	struct spi_delay  inactive_delay =  { .value = 1, .unit = 1} ;
-	struct spi_delay  setup_delay =  { .value = 1, .unit = 10} ;
-	struct spi_delay  hold_delay =  { .value = 1, .unit = 10} ;
-#endif
 
 	//unsigned long flags;
 
@@ -507,16 +502,12 @@ static int unipi_spi_probe(struct spi_device *spi)
 	spi->mode		    = spi->mode ? spi->mode : SPI_MODE_0;
 	spi->max_speed_hz	= spi->max_speed_hz ? spi->max_speed_hz : 12000000;
 	spi->rt = 1;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,13,0)
-	spi_set_cs_timing(spi, &setup_delay, &hold_delay, &inactive_delay);
-#else
     spi->cs_inactive.value = 1;
     spi->cs_inactive.unit  = SPI_DELAY_UNIT_USECS;
     spi->cs_setup.value = 10;
     spi->cs_setup.unit  = SPI_DELAY_UNIT_NSECS;
     spi->cs_hold.value = 10;
     spi->cs_hold.unit  = SPI_DELAY_UNIT_NSECS;
-#endif
 
 	ret = spi_setup(spi);
 	if (ret) {
@@ -536,8 +527,12 @@ static int unipi_spi_probe(struct spi_device *spi)
 	spin_lock_init(&n_spi->busy_lock);
 	n_spi->busy = 0;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,13,0)
 	hrtimer_init(&n_spi->frame_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	n_spi->frame_timer.function = unipi_spi_timer_func;
+#else
+	hrtimer_setup(&n_spi->frame_timer, unipi_spi_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+#endif
 	n_spi->spi_dev = spi; // required by timer
 
 	unipi_spi_trace(spi, "Max Hz controller=%d device=%d\n", spi->master->max_speed_hz, spi->max_speed_hz);
@@ -621,11 +616,7 @@ static int unipi_spi_probe(struct spi_device *spi)
 	return ret;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
-static int unipi_spi_remove(struct spi_device *spi)
-#else
 static void unipi_spi_remove(struct spi_device *spi)
-#endif
 {
 	struct unipi_spi_device *n_spi = spi_get_drvdata(spi);
 
@@ -634,9 +625,6 @@ static void unipi_spi_remove(struct spi_device *spi)
 		kfree(n_spi);
 		dev_info(&spi->dev, "spi channel removed\n");
 	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
-	return 0;
-#endif
 }
 
 

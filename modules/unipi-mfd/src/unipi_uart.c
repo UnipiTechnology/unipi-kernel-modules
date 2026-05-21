@@ -265,11 +265,7 @@ static int unipi_uart_ioctl(struct uart_port *port, unsigned int ioctl_code, uns
 }
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,1,0)
-static void unipi_uart_set_termios(struct uart_port *port, struct ktermios *termios, struct ktermios *old)
-#else
 static void unipi_uart_set_termios(struct uart_port *port, struct ktermios *termios, const struct ktermios *old)
-#endif
 {
 	struct unipi_uart_port *n_port = to_unipi_uart_port(port, port);
 
@@ -303,11 +299,7 @@ static void unipi_uart_set_termios(struct uart_port *port, struct ktermios *term
     unipi_uart_update_timeout(n_port, termios->c_cflag, n_port->baud);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)
-static int unipi_uart_config_rs485(struct uart_port *port, struct serial_rs485 *rs485)
-#else
 static int unipi_uart_config_rs485(struct uart_port *port, struct ktermios *termios, struct serial_rs485 *rs485)
-#endif
 {
 	port->rs485 = *rs485;
 	return 0;
@@ -791,8 +783,12 @@ static int unipi_uart_port_probe(struct device *dev, struct unipi_uart_device *n
 	} else if ((fw_variant & 0xff00) == 0) {
 		port->tx_fifo_reg = 7; //Brain=7 n_spi->regstart_table->uart_queue_reg;      // define modbus register
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,13,0)
 	hrtimer_init(&port->tx_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	port->tx_timer.function = unipi_uart_timer_func;
+#else
+	hrtimer_setup(&port->tx_timer, unipi_uart_timer_func, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+#endif
 
 	ret = uart_add_one_port(&unipi_uart_uart_driver, &port->port);
 	if (ret) {
