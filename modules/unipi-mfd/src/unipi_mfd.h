@@ -21,7 +21,6 @@
  * Standard registers and coils supported by any Unipi MFD firmware 
 */
 #define UNIPI_MFD_COIL_WAS_WATCHDOG  1000
-#define UNIPI_MFD_COIL_OW_POWER_OFF  1001
 #define UNIPI_MFD_COIL_REBOOT        1002
 #define UNIPI_MFD_COIL_NVRAM_SAVE    1003
 #define UNIPI_MFD_COIL_FIRMWARE_MODE 1004

@@ -42,69 +42,31 @@ EOF
     ################## end of dkms #################333
 fi
 
+#RPI_CONFLICT="linux-base-rpi-v8, linux-base-rpi-2712, linux-baserpi-v8-rt, linux-base-rpi-v8-rt"
+BINARY_PKG_NAME=unipi-kernel-modules
 case "${PRODUCT}" in
-    unipi1 | neuron)
-        BINARY_PKG_NAME=unipi-kernel-modules
-        PKG_KERNEL_HEADERS="linux-headers-rpi-v7"
-        PKG_KERNEL_IMAGE=linux-image-rpi-v7
-        ;;
-    neuron64 | unipi1x64)
-        BINARY_PKG_NAME=unipi-kernel-modules
-        PKG_KERNEL_HEADERS="linux-headers-rpi-v8 linux-headers-rpi-2712"
-        PKG_KERNEL_IMAGE=linux-image-rpi-v8
-        ALTERNATIVE_KERNEL_IMAGE=linux-image-rpi-2712
-        ;;
-    neuron64u | neuronu | unipi1u | unipi1x64u | edge | g1 | zulu | iris | patron)
-        BINARY_PKG_NAME=unipi-kernel-modules
+    edge | zulu)
         PKG_KERNEL_HEADERS=unipi-kernel-headers
         PKG_KERNEL_IMAGE=unipi-kernel
         ;;
-    axon )
-        BINARY_PKG_NAME=unipi-kernel-modules
-        PKG_KERNEL_HEADERS=axon-kernel-headers
-        PKG_KERNEL_IMAGE=axon-kernel-image
+    * )
+        echo "Unsupported platform" >&2
+        exit 1
         ;;
 esac
 
 PKG_KERNEL_VER="$(dpkg-query -f='${Version}\n' -W ${PKG_KERNEL_HEADERS} | sed -n '1p')"
 echo "PKG_KERNEL_VER = ${PKG_KERNEL_VER}"
-# after rpi kernel 1.20210303-1 the version is prefixed with "1:", e.g. 1:1.20210430-2
-# this breaks the combined version since it is no longer a number (1.66.1:1.20210430-2)
-# we will strip the first ":" part
-# but in dependencies, we need to keep it !!!
+# strip the first ":" part (epoch)
 PKG_KERNEL_VER_STRIPPED="$(echo ${PKG_KERNEL_VER} | cut -d":" -f 2-)"
 echo "PKG_KERNEL_VER_STRIPPED = ${PKG_KERNEL_VER_STRIPPED}"
 
-if [ -n "$ALTERNATIVE_KERNEL_IMAGE" ]; then
-    ALTERNATIVE_KERNEL_IMAGE="| ${ALTERNATIVE_KERNEL_IMAGE}(=$PKG_KERNEL_VER)"
-fi
-
-
-if [ "${PRODUCT}" = "neuron" ] || [ "${PRODUCT}" = "unipi1" ] ; then
-    #PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
-    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | sed 's/^.*\(linux-headers-\)/\1/;s/,.*//')"
-    # in raspberrypi-kernel-headers can be more than one kernels for different SoC
-    LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/usr\/lib\/modules\/.*-v7.*\/build$/p'))
-    LINUX_DIR_PATH="${LINUX_DIR_ARR[*]}"
-
-elif [ "${PRODUCT}" = "neuron64" ] || [ "${PRODUCT}" = "unipi1x64" ] ; then
-    #PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | cut -d\  -f1)"
-    PKG_KERNEL_HEADERS="$(dpkg-query -f='${Depends}\n' -W ${PKG_KERNEL_HEADERS} | sed 's/^.*\(linux-headers-\)/\1/;s/,.*//')"
-    LINUX_DIR_ARR=($(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/usr\/lib\/modules\/.*\/build$/p'))
-    LINUX_DIR_PATH="${LINUX_DIR_ARR[*]}"
-
-else
-    LINUX_DIR_PATH=$(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/lib\/modules\/.*\/build$/p')
-fi
+LINUX_DIR_PATH=$(dpkg -L ${PKG_KERNEL_HEADERS} | sed -n '/^\/lib\/modules\/.*\/build$/p')
 
 #####################################################################
 ### Create changelog for binary packages with modified version string
 
-if [ "$PRODUCT" == "neuron64u" ] || [ "$PRODUCT" == "neuronu" ] || [ "$PRODUCT" == "unipi1u" ] || [ "$PRODUCT" == "unipi1x64u" ] || [ "$PRODUCT" == "edge" ] ; then
-    MODULES_VERSION=${PROJECT_VERSION}~${PKG_KERNEL_VER_STRIPPED}
-else
-    MODULES_VERSION=${PROJECT_VERSION}.${PKG_KERNEL_VER_STRIPPED}
-fi
+MODULES_VERSION=${PROJECT_VERSION}~${PKG_KERNEL_VER_STRIPPED}
 cat  >debian/${BINARY_PKG_NAME}.changelog <<EOF
 unipi-kernel-modules (${MODULES_VERSION}) unstable; urgency=medium
   * Compiled for ${PKG_KERNEL_IMAGE}
@@ -116,43 +78,13 @@ cat debian/changelog >>debian/${BINARY_PKG_NAME}.changelog
 #####################################################################
 ### Append binary packages definition to control file
 
-unset pre_depends
-depends="unipi-os-configurator-data(>=0.7.test.20220815)"
-#suggests="unipi-firmware"
-unset suggests
-if [ "$PRODUCT" = "neuron" ] && [ "${DEBIAN_VERSION}" = "bullseye" ]; then
-    depends="$depends, unipi-kernel-modules-64on32"
-fi
-if [ "$PRODUCT" = "neuron" ] && [ "${DEBIAN_VERSION}" = "bookworm" ]; then
-    recommends="unipi-kernel-modules-64on32:arm64"
-fi
-
-if [ ${BINARY_PKG_NAME} == "unipi-kernel-modules" ]; then
-    breaks="neuron-kernel"
-    provides=""
-elif [ ${BINARY_PKG_NAME} == "neuron-kernel" ]; then
-    breaks=""
-    provides="unipi-kernel-modules(=${PROJECT_VERSION})"
-else
-    breaks="unipi-kernel-modules, neuron-kernel"
-    provides="unipi-kernel-modules(=${PROJECT_VERSION})"
-fi
-
-replaces=${breaks}
-breaks="unipi-os-configurator (<= 0.82)"
-[ -n "${replaces}" ] && breaks="${breaks}, ${replaces}"
+depends="unipi-os-configurator-data"
 
 cat >>debian/control <<EOF
 
 Package: ${BINARY_PKG_NAME}
 Architecture: ${arch}
-Pre-Depends: ${pre_depends}
-Depends: ${misc:Depends}, ${PKG_KERNEL_IMAGE}(=${PKG_KERNEL_VER}) ${ALTERNATIVE_KERNEL_IMAGE}, ${depends}
-Recommends: ${recommends}
-Suggests: ${suggests}
-Provides: ${provides}
-Replaces: ${replaces}
-Breaks: ${breaks}
+Depends: ${misc:Depends}, ${PKG_KERNEL_IMAGE}(=${PKG_KERNEL_VER}), ${depends}
 Description: Unipi kernel modules
  Binary kernel modules for Unipi controllers.
  Compiled for ${PKG_KERNEL_IMAGE} version ${PKG_KERNEL_VER}.
@@ -168,73 +100,19 @@ cat  >debian/rules.in <<EOF
 	dh \$@
 
 override_dh_auto_install:
-	mkdir -p debian/unipi-kernel-modules-64on32
-	cp -Rf debian/tempdest/* debian/unipi-kernel-modules-64on32 || exit 1;
-	rm -rf debian/unipi-kernel-modules-64on32/lib/modules/*-2712 || exit 1;
 	mkdir -p debian/${BINARY_PKG_NAME}
-	mv debian/tempdest/* debian/${BINARY_PKG_NAME} || exit 1;
+	mv debian/tempdest/* debian/${BINARY_PKG_NAME}
 
 override_dh_auto_build:
-		for LDP in ${LINUX_DIR_PATH}; do \
-			make clean || exit 1;\
-			dh_auto_build -- LINUX_DIR_PATH=\$\${LDP} || exit 1;\
-			dh_auto_install --destdir=debian/tempdest -- LINUX_DIR_PATH=\$\${LDP} || exit 1;\
-		done
+	make clean
+	dh_auto_build -- LINUX_DIR_PATH=${LINUX_DIR_PATH}
+	dh_auto_install --destdir=debian/tempdest -- LINUX_DIR_PATH=${LINUX_DIR_PATH}
 EOF
 
 echo "==============================================================================================================="
 echo "debian/rules"
 echo "==============================================================================================================="
 cat debian/rules.in
-
-if [ "$PRODUCT" = "neuron64" ] && [ "${DEBIAN_VERSION}" = "bullseye" ]; then
-    sed 's/Architecture: all/Architecture: amd64/' -i debian/control
-    cat >>debian/control <<EOF
-
-Package: unipi-kernel-modules-64on32
-Architecture: all
-Depends: ${PKG_KERNEL_IMAGE}(=${PKG_KERNEL_VER})
-Description: Unipi kernel modules for 32bit Raspbian with 64bit kernel
- Use only on system with raspberrypi 32bit OS with running 64bit kernel.
- Requires unipi-kernel-modules (armhf) installed.
-
-EOF
-
-    MODULES_VERSION32="$(echo $MODULES_VERSION | sed 's/neuron64/neuron/')"
-
-    cat  >debian/unipi-kernel-modules-64on32.changelog <<EOF
-unipi-kernel-modules (${MODULES_VERSION32}) unstable; urgency=medium
-  * Compiled for ${PKG_KERNEL_IMAGE}
- -- auto-generator <info@unipi.technology>  $(date -R)
-
-EOF
-    cat debian/changelog >>debian/${BINARY_PKG_NAME}.changelog
-fi
-
-if [ "$PRODUCT" = "neuron64" ] && [ "${DEBIAN_VERSION}" = "bookworm" ]; then
-    sed 's/Architecture: all/Architecture: amd64/' -i debian/control
-    cat >>debian/control <<EOF
-
-Package: unipi-kernel-modules-64on32
-Architecture: arm64
-Depends: ${PKG_KERNEL_IMAGE}:arm64(=${PKG_KERNEL_VER})
-Description: Unipi kernel modules for 32bit Raspbian with 64bit kernel
- Use only on system with raspberrypi 32bit OS with running 64bit kernel.
- Requires unipi-kernel-modules (armhf) installed.
-
-EOF
-
-    MODULES_VERSION32="$(echo $MODULES_VERSION | sed 's/neuron64/neuron/')"
-
-    cat  >debian/unipi-kernel-modules-64on32.changelog <<EOF
-unipi-kernel-modules (${MODULES_VERSION32}) unstable; urgency=medium
-  * Compiled for ${PKG_KERNEL_IMAGE}
- -- auto-generator <info@unipi.technology>  $(date -R)
-
-EOF
-    cat debian/changelog >>debian/${BINARY_PKG_NAME}.changelog
-fi
-
 
 echo "==============================================================================================================="
 echo "debian/control"

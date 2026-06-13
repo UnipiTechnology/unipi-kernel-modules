@@ -99,7 +99,7 @@ static int unipi_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
 {
 	/* 0=out, 1=in */
 	struct unipi_gpiochip_device *unipi_gpiochip = gpiochip_get_data(chip);
-	return (unipi_gpiochip->data->flags & UNIPI_GPIO_OUT)? 0 : 1;
+	return (unipi_gpiochip->data->flags & UNIPI_GPIO_OUT)? GPIO_LINE_DIRECTION_OUT : GPIO_LINE_DIRECTION_IN;
 }
 
 static const struct unipi_gpiochip_data unipi_gpiochip_data_di = {

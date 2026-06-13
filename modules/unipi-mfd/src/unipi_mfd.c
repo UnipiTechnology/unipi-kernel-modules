@@ -337,11 +337,6 @@ static struct dev_mfd_attribute dev_attr_was_watchdog = {
 	UNIPI_MFD_COIL_WAS_WATCHDOG
 };
 
-static struct dev_mfd_attribute dev_attr_ow_power_off = {
-	__ATTR(ow_power_off, 0664, unipi_mfd_show_bool, unipi_mfd_store_bool),
-	UNIPI_MFD_COIL_OW_POWER_OFF
-};
-
 static struct dev_mfd_attribute dev_attr_reboot = {
 	__ATTR(reboot, 0220, NULL, unipi_mfd_store_bool),
 	UNIPI_MFD_COIL_REBOOT
@@ -400,7 +395,6 @@ static struct dev_mfd_attribute dev_attr_cycle_counter = {
 static struct attribute *unipi_mfd_device_attrs[] = {
 	&dev_attr_reboot.attr.attr,
 	&dev_attr_was_watchdog.attr.attr,
-	&dev_attr_ow_power_off.attr.attr,
 	&dev_attr_save_nvram.attr.attr,
 	&dev_attr_firmware_version.attr.attr,
 	&dev_attr_firmware_variant.attr.attr,

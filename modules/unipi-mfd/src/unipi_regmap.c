@@ -247,7 +247,9 @@ static int unipi_regmap_hw_gather_write_coil(void *context, const void *reg, siz
 		if (((u8*)val)[i]!=0) buffer[0] |= 1 << i;
 	}
 	ret = unipi_write_bits_sync(channel, *(u16*)reg, val_len, (u8*)buffer);
-    return ret >= 0;
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 static int unipi_regmap_hw_write_coil(void *context, const void *buf, size_t buf_size)
@@ -277,15 +279,9 @@ static int unipi_regmap_async_write_coil(void *context,  const void *reg, size_t
 	//printk("Async r=%d, v=%d l=%ld", *(u16*)reg, buffer[0], val_len);
 	async->buffer = NULL;
 	ret = unipi_write_bits_async(channel, *(u16*)reg, val_len, (u8*)buffer, async, unipi_regmap_complete);
-	return ret;
-
-//	printk("async write coil rlen=%ld vlen=%ld reg=", reg_len, val_len);
-/*
-	for (i=0; i< reg_len; i++) printk("%02x ", *((u8*)reg+i)); 
-	if (val) {
-		for (i=0; i< val_len; i++) printk("%02x ", *((u8*)val+i)); 
-	}
-*/
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 
