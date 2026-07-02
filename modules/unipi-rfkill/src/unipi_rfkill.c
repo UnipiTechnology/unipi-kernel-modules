@@ -3,28 +3,29 @@
  * Copyright (c) 2022, Miroslav Ondra, Faster CZ, Unipi Technology
  */
 
+#include <linux/acpi.h>
+#include <linux/clk.h>
+#include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/mod_devicetable.h>
-#include <linux/rfkill.h>
-#include <linux/platform_device.h>
-#include <linux/clk.h>
-#include <linux/slab.h>
-#include <linux/acpi.h>
-#include <linux/gpio/consumer.h>
-#include <linux/delay.h>
-#include <linux/spinlock.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/platform_device.h>
+#include <linux/rfkill.h>
+#include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/usb.h>
 #include <linux/version.h>
 
-
 #ifdef UNIPI_RFKILL_DETAILED_DEBUG
-# define unipi_rfkill_trace(rfkill, f, args...)	dev_info(rfkill->dev, f, ##args)
+#define unipi_rfkill_trace(rfkill, f, args...) dev_info(rfkill->dev, f, ##args)
 #else
-# define unipi_rfkill_trace(args...) {}
+#define unipi_rfkill_trace(args...) \
+	{                           \
+	}
 #endif
 
 enum {
@@ -41,34 +42,34 @@ enum unipi_rfkill_state {
 };
 
 struct unipi_rfkill_data {
-	const char		*name;
-	enum rfkill_type	type;
-	const char		*monitor_usb;
-	struct gpio_desc	*reset_gpio;
-	struct gpio_desc	*rfkill_gpio;
-	int			use_reset_as_monitor;
+	const char *name;
+	enum rfkill_type type;
+	const char *monitor_usb;
+	struct gpio_desc *reset_gpio;
+	struct gpio_desc *rfkill_gpio;
+	int use_reset_as_monitor;
 
-	struct rfkill		*rfkill_dev;
-	unsigned int		algo;
-	unsigned int		start_pulse_ms;
-	unsigned int		stop_pulse_ms;
-	unsigned int		wait_after_ms;
-	unsigned int		reset_pulse_ms;
+	struct rfkill *rfkill_dev;
+	unsigned int algo;
+	unsigned int start_pulse_ms;
+	unsigned int stop_pulse_ms;
+	unsigned int wait_after_ms;
+	unsigned int reset_pulse_ms;
 	struct device *dev;
-	spinlock_t		lock;
+	spinlock_t lock;
 	enum unipi_rfkill_state state;
 	int in_op;
 	int counter;
 };
 
-
 static int device_match_of_name(struct usb_device *usbdev, void *name)
 {
 	struct device *dev = &usbdev->dev;
 	/*
-	 * if (dev->of_node != NULL)
-	 *    printk("cmp: n: %s, fn: %s\n",dev->of_node->name, dev->of_node->full_name);
-	 */
+   * if (dev->of_node != NULL)
+   *    printk("cmp: n: %s, fn: %s\n",dev->of_node->name,
+   * dev->of_node->full_name);
+   */
 	return (dev->of_node != NULL) && of_node_name_eq(dev->of_node, name);
 }
 
@@ -93,45 +94,49 @@ static void unipi_quectel_poll(struct rfkill *rfkill_dev, void *data)
 	else
 		return;
 
-	unipi_rfkill_trace(rfkill, "Poll: modemstate=%d, fsm=%d\n", status, rfkill->state);
+	unipi_rfkill_trace(rfkill, "Poll: modemstate=%d, fsm=%d\n", status,
+			   rfkill->state);
 	op = 0;
 
 	spin_lock_irqsave(&rfkill->lock, flags);
 	rfkill->counter++;
 	switch (rfkill->state) {
 	case UNIPI_RFKILL_STATE_ON:
-			if (!status) {
-				rfkill->state = UNIPI_RFKILL_STATE_WAIT_ON;//UNIPI_RFKILL_STATE_INOP_UNBLOCK;
-				op = 1;
-			}
-			break;
+		if (!status) {
+			rfkill->state =
+				UNIPI_RFKILL_STATE_WAIT_ON; // UNIPI_RFKILL_STATE_INOP_UNBLOCK;
+			op = 1;
+		}
+		break;
 	case UNIPI_RFKILL_STATE_OFF:
-			if (status)
-				rfkill->state = UNIPI_RFKILL_STATE_ON;
-			break;
+		if (status)
+			rfkill->state = UNIPI_RFKILL_STATE_ON;
+		break;
 
 	case UNIPI_RFKILL_STATE_WAIT_ON:
-			if (status)
-				rfkill->state = UNIPI_RFKILL_STATE_ON;
-			else if (rfkill->counter > 3)
-				op = 1;
-			break;
+		if (status)
+			rfkill->state = UNIPI_RFKILL_STATE_ON;
+		else if (rfkill->counter > 3)
+			op = 1;
+		break;
 
 	case UNIPI_RFKILL_STATE_WAIT_OFF:
-			if (!status)
-				rfkill->state = UNIPI_RFKILL_STATE_OFF;
-			else if (rfkill->reset_gpio && (rfkill->counter > 3)) {
-				/* generate pulse on reset_gpio in case of unsuccessfull shutdown operation */
-				rfkill->state = UNIPI_RFKILL_STATE_WAIT_OFF;
-				op = 2;
-			}
-			break;
+		if (!status)
+			rfkill->state = UNIPI_RFKILL_STATE_OFF;
+		else if (rfkill->reset_gpio && (rfkill->counter > 3)) {
+			/* generate pulse on reset_gpio in case of unsuccessfull shutdown
+       * operation */
+			rfkill->state = UNIPI_RFKILL_STATE_WAIT_OFF;
+			op = 2;
+		}
+		break;
 
 	case UNIPI_RFKILL_STATE_UNKNOWN:
-			rfkill->state = status ? UNIPI_RFKILL_STATE_ON : UNIPI_RFKILL_STATE_OFF;
-			break;
+		rfkill->state = status ? UNIPI_RFKILL_STATE_ON :
+					 UNIPI_RFKILL_STATE_OFF;
+		break;
 	default:
-			break;
+		break;
 	}
 	if (op)
 		rfkill->in_op = 1;
@@ -157,12 +162,14 @@ static void unipi_quectel_poll(struct rfkill *rfkill_dev, void *data)
 	spin_unlock_irqrestore(&rfkill->lock, flags);
 }
 
-static int unipi_quectel_block_or_reset(struct unipi_rfkill_data *rfkill, int blockop)
+static int unipi_quectel_block_or_reset(struct unipi_rfkill_data *rfkill,
+					int blockop)
 {
 	unsigned long flags;
 	int op;
 
-	unipi_rfkill_trace(rfkill, "Set blocked=%d fsm=%d\n", blockop, rfkill->state);
+	unipi_rfkill_trace(rfkill, "Set blocked=%d fsm=%d\n", blockop,
+			   rfkill->state);
 
 	if (rfkill->state == UNIPI_RFKILL_STATE_UNKNOWN)
 		unipi_quectel_poll(NULL, rfkill);
@@ -210,7 +217,7 @@ static int unipi_quectel_block_or_reset(struct unipi_rfkill_data *rfkill, int bl
 
 	/* generate pulse on rfkill_gpio */
 	gpiod_set_value_cansleep(rfkill->rfkill_gpio, 1);
-	mdelay(blockop == 0?rfkill->start_pulse_ms:rfkill->stop_pulse_ms);
+	mdelay(blockop == 0 ? rfkill->start_pulse_ms : rfkill->stop_pulse_ms);
 	gpiod_set_value_cansleep(rfkill->rfkill_gpio, 0);
 	mdelay(rfkill->wait_after_ms);
 
@@ -256,26 +263,33 @@ struct unipi_rfkill_data unipi_rfkill_data_simple = {
 };
 
 struct unipi_rfkill_data unipi_rfkill_data_pulse = {
-	.start_pulse_ms = 1000, .stop_pulse_ms = 1000, .reset_pulse_ms = 300,
+	.start_pulse_ms = 1000,
+	.stop_pulse_ms = 1000,
+	.reset_pulse_ms = 300,
 	.wait_after_ms = 20,
 	.algo = UNIPI_RFKILL_ALGO_PULSE,
 };
 
 struct unipi_rfkill_data unipi_rfkill_data_quectel = {
-	.start_pulse_ms = 500, .stop_pulse_ms = 600, .reset_pulse_ms = 300,
+	.start_pulse_ms = 500,
+	.stop_pulse_ms = 600,
+	.reset_pulse_ms = 300,
 	.wait_after_ms = 20,
 	.algo = UNIPI_RFKILL_ALGO_PULSE,
 };
 
 static const struct of_device_id unipi_rfkill_ids[] = {
-	{ .compatible = "unipi,unipi-rfkill", .data = &unipi_rfkill_data_simple },
-	{ .compatible = "unipi,rfkill-level", .data = &unipi_rfkill_data_simple },
-	{ .compatible = "unipi,rfkill-pulse", .data = &unipi_rfkill_data_pulse },
-	{ .compatible = "unipi,rfkill-quectel912", .data = &unipi_rfkill_data_quectel },
-	{ /*sentinel */}
+	{ .compatible = "unipi,unipi-rfkill",
+	  .data = &unipi_rfkill_data_simple },
+	{ .compatible = "unipi,rfkill-level",
+	  .data = &unipi_rfkill_data_simple },
+	{ .compatible = "unipi,rfkill-pulse",
+	  .data = &unipi_rfkill_data_pulse },
+	{ .compatible = "unipi,rfkill-quectel912",
+	  .data = &unipi_rfkill_data_quectel },
+	{ /*sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, unipi_rfkill_ids);
-
 
 static int unipi_rfkill_probe(struct platform_device *pdev)
 {
@@ -313,7 +327,8 @@ static int unipi_rfkill_probe(struct platform_device *pdev)
 		rfkill->stop_pulse_ms = value;
 	if (of_property_read_u32(np, "reset-pulse-ms", &value) == 0)
 		rfkill->reset_pulse_ms = value;
-	rfkill->use_reset_as_monitor = of_property_read_bool(np, "use-reset-as-monitor");
+	rfkill->use_reset_as_monitor =
+		of_property_read_bool(np, "use-reset-as-monitor");
 
 	if (!rfkill->name)
 		rfkill->name = dev_name(dev);
@@ -345,16 +360,19 @@ static int unipi_rfkill_probe(struct platform_device *pdev)
 	/* Make sure at-least one GPIO is defined for this instance */
 	if (rfkill->algo == UNIPI_RFKILL_ALGO_PULSE) {
 		if (!rfkill->use_reset_as_monitor && !rfkill->monitor_usb) {
-			dev_err(&pdev->dev, "invalid platform data - undefined status monitor\n");
+			dev_err(&pdev->dev,
+				"invalid platform data - undefined status monitor\n");
 			return -EINVAL;
 		}
 	}
 
 	spin_lock_init(&rfkill->lock);
 
-	rfkill->rfkill_dev = rfkill_alloc(rfkill->name, &pdev->dev, rfkill->type,
-				(rfkill->algo == UNIPI_RFKILL_ALGO_PULSE) ? &unipi_quectel_ops : &unipi_level_ops,
-				rfkill);
+	rfkill->rfkill_dev = rfkill_alloc(
+		rfkill->name, &pdev->dev, rfkill->type,
+		(rfkill->algo == UNIPI_RFKILL_ALGO_PULSE) ? &unipi_quectel_ops :
+							    &unipi_level_ops,
+		rfkill);
 	if (!rfkill->rfkill_dev)
 		return -ENOMEM;
 
@@ -390,15 +408,15 @@ static void unipi_rfkill_remove(struct platform_device *pdev)
 #endif
 }
 
-
 static struct platform_driver unipi_rfkill_driver = {
-	.probe = unipi_rfkill_probe,
-	.remove = unipi_rfkill_remove,
-	.driver = {
-		.name = "unipi_rfkill",
-		.of_match_table = of_match_ptr(unipi_rfkill_ids),
-		.owner = THIS_MODULE,
-	},
+    .probe = unipi_rfkill_probe,
+    .remove = unipi_rfkill_remove,
+    .driver =
+        {
+            .name = "unipi_rfkill",
+            .of_match_table = of_match_ptr(unipi_rfkill_ids),
+            .owner = THIS_MODULE,
+        },
 };
 
 module_platform_driver(unipi_rfkill_driver);

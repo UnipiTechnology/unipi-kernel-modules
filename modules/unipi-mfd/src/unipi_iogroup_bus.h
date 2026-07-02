@@ -13,13 +13,12 @@
 #ifndef MODULES_UNIPI_SPI_SRC_UNIPI_IOGROUP_H_
 #define MODULES_UNIPI_SPI_SRC_UNIPI_IOGROUP_H_
 
-#include <linux/version.h>
 #include <linux/nvmem-consumer.h>
+#include <linux/version.h>
 
 #include "unipi_common.h"
 
 struct unipi_iogroup_device;
-
 
 /**
  * struct unipi_iogroup_device - Plc side proxy for an SPI slave device
@@ -39,28 +38,30 @@ struct unipi_iogroup_device;
  * information about how this particular board wires the chip's pins.
  */
 struct unipi_iogroup_device {
-	struct device         dev;
+	struct device dev;
 	struct unipi_channel *channel;
-	u8                    address;
-	int                   irq;
-	int                   variant_index;
-	struct device_node   *variant_node;
-	struct hrtimer        poll_timer;
-	int                   poll_enabled;
-	char                  modalias[SPI_NAME_SIZE];
-	void                 *uart_rx_self;
-	void                (*uart_rx_callback)(void*, int port);
+	u8 address;
+	int irq;
+	int variant_index;
+	struct device_node *variant_node;
+	struct hrtimer poll_timer;
+	int poll_enabled;
+	char modalias[SPI_NAME_SIZE];
+	void *uart_rx_self;
+	void (*uart_rx_callback)(void *, int port);
 	/* the statistics */
-	//struct spi_statistics	statistics;
+	// struct spi_statistics	statistics;
 };
 
-static inline struct unipi_iogroup_device *to_unipi_iogroup_device(struct device *dev)
+static inline struct unipi_iogroup_device *
+to_unipi_iogroup_device(struct device *dev)
 {
 	return dev ? container_of(dev, struct unipi_iogroup_device, dev) : NULL;
 }
 
 /* most drivers won't need to care about device refcounting */
-static inline struct unipi_iogroup_device *unipi_iogroup_dev_get(struct unipi_iogroup_device *iogroup)
+static inline struct unipi_iogroup_device *
+unipi_iogroup_dev_get(struct unipi_iogroup_device *iogroup)
 {
 	return (iogroup && get_device(&iogroup->dev)) ? iogroup : NULL;
 }
@@ -84,38 +85,45 @@ static inline void unipi_iogroup_dev_put(struct unipi_iogroup_device *iogroup)
  *	field of this structure.
  */
 struct unipi_iogroup_driver {
-	int			(*probe)(struct unipi_iogroup_device *iogroup);
-	int			(*remove)(struct unipi_iogroup_device *iogroup);
-	void		(*shutdown)(struct unipi_iogroup_device *iogroup);
-	struct device_driver	driver;
+	int (*probe)(struct unipi_iogroup_device *iogroup);
+	int (*remove)(struct unipi_iogroup_device *iogroup);
+	void (*shutdown)(struct unipi_iogroup_device *iogroup);
+	struct device_driver driver;
 };
 
 /* device driver data */
 
 /*
-static inline void unipi_iogroup_set_drvdata(struct unipi_iogroup_device *iogroup, void *data)
+static inline void unipi_iogroup_set_drvdata(struct unipi_iogroup_device
+*iogroup, void *data)
 {
-	dev_set_drvdata(&iogroup->dev, data);
+        dev_set_drvdata(&iogroup->dev, data);
 }
 
-static inline void *unipi_iogroup_get_drvdata(struct unipi_iogroup_device *iogroup)
+static inline void *unipi_iogroup_get_drvdata(struct unipi_iogroup_device
+*iogroup)
 {
-	return dev_get_drvdata(&iogroup->dev);
+        return dev_get_drvdata(&iogroup->dev);
 }
 */
-static inline struct unipi_iogroup_driver *to_unipi_iogroup_driver(struct device_driver *drv)
+static inline struct unipi_iogroup_driver *
+to_unipi_iogroup_driver(struct device_driver *drv)
 {
-	return drv ? container_of(drv, struct unipi_iogroup_driver, driver) : NULL;
+	return drv ? container_of(drv, struct unipi_iogroup_driver, driver) :
+		     NULL;
 }
 
-extern int __unipi_iogroup_register_driver(struct module *owner, struct unipi_iogroup_driver *sdrv);
+extern int __unipi_iogroup_register_driver(struct module *owner,
+					   struct unipi_iogroup_driver *sdrv);
 
 /**
- * unipi_iogroup_unregister_driver - reverse effect of unipi_iogroup_register_driver
+ * unipi_iogroup_unregister_driver - reverse effect of
+ * unipi_iogroup_register_driver
  * @sdrv: the driver to unregister
  * Context: can sleep
  */
-static inline void unipi_iogroup_unregister_driver(struct unipi_iogroup_driver *sdrv)
+static inline void
+unipi_iogroup_unregister_driver(struct unipi_iogroup_driver *sdrv)
 {
 	if (sdrv)
 		driver_unregister(&sdrv->driver);
@@ -126,11 +134,12 @@ static inline void unipi_iogroup_unregister_driver(struct unipi_iogroup_driver *
 	__unipi_iogroup_register_driver(THIS_MODULE, driver)
 
 struct unipi_iogroup_device *
-       of_register_iogroup_device(struct unipi_channel *channel, struct device_node *nc);
+of_register_iogroup_device(struct unipi_channel *channel,
+			   struct device_node *nc);
 struct unipi_iogroup_device *
-       register_iogroup_device(struct unipi_channel *channel, int reg, const char* modalias);
+register_iogroup_device(struct unipi_channel *channel, int reg,
+			const char *modalias);
 void iogroup_unregister_by_channel(struct unipi_channel *channel);
 void iogroup_unregister_device(struct unipi_iogroup_device *iogroup);
-
 
 #endif

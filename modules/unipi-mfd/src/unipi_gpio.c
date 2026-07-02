@@ -8,43 +8,42 @@
 
 #include <linux/err.h>
 #include <linux/gpio/driver.h>
+#include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
-#include <linux/mfd/syscon.h>
 
 #include "unipi_common.h"
 #include "unipi_iogroup_bus.h"
 #include "unipi_mfd.h"
 
-#define UNIPI_GPIO_IN	BIT(0)
-#define UNIPI_GPIO_OUT	BIT(1)
-
+#define UNIPI_GPIO_IN BIT(0)
+#define UNIPI_GPIO_OUT BIT(1)
 
 struct unipi_gpiochip_data {
-	char*			regmap_name;
-	int				is_coil_map;
-	char*			dt_value_reg_name;
-	unsigned int	flags;  /* UNIPI_GPIO_IN | UNIPI_GPIO_OUT */
-	int				to_reg_shift;
-	int				to_bit_mask;
-	char			*fname;
+	char *regmap_name;
+	int is_coil_map;
+	char *dt_value_reg_name;
+	unsigned int flags; /* UNIPI_GPIO_IN | UNIPI_GPIO_OUT */
+	int to_reg_shift;
+	int to_bit_mask;
+	char *fname;
 };
 
 struct unipi_gpiochip_device {
-	struct gpio_chip		chip;
-	struct regmap*			map;
-	const struct unipi_gpiochip_data	*data;
-	u32						ngpio;
-	u32						value_reg;
-	int						debounce_reg;
-	int						counter_reg;
-	int						ds_count;
-	int						ds_enable_coil;
-	int						ds_toggle_coil;
-	int						ds_inv_coil;
+	struct gpio_chip chip;
+	struct regmap *map;
+	const struct unipi_gpiochip_data *data;
+	u32 ngpio;
+	u32 value_reg;
+	int debounce_reg;
+	int counter_reg;
+	int ds_count;
+	int ds_enable_coil;
+	int ds_toggle_coil;
+	int ds_inv_coil;
 	struct unipi_gpio_sysfs_kobj *kobj;
 };
 
@@ -54,8 +53,9 @@ static int unipi_gpio_get(struct gpio_chip *chip, unsigned offset)
 	unsigned int val, offs;
 	int ret;
 
-	offs = unipi_gpiochip->value_reg + (offset >> unipi_gpiochip->data->to_reg_shift);
-	//printk("gpio get %d, %d", offset, offs);
+	offs = unipi_gpiochip->value_reg +
+	       (offset >> unipi_gpiochip->data->to_reg_shift);
+	// printk("gpio get %d, %d", offset, offs);
 
 	ret = regmap_read(unipi_gpiochip->map, offs, &val);
 	if (ret)
@@ -64,34 +64,38 @@ static int unipi_gpio_get(struct gpio_chip *chip, unsigned offset)
 	return !!(val & BIT(offset & unipi_gpiochip->data->to_bit_mask));
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,18,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
 static void unipi_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 {
 	/* using coils to update */
 	struct unipi_gpiochip_device *unipi_gpiochip = gpiochip_get_data(chip);
-	//printk("gpio set %d, %d", offset, val);
+	// printk("gpio set %d, %d", offset, val);
 
-	regmap_write(unipi_gpiochip->map, unipi_gpiochip->value_reg + offset, !!val);
+	regmap_write(unipi_gpiochip->map, unipi_gpiochip->value_reg + offset,
+		     !!val);
 }
 #else
 static int unipi_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
 {
 	/* using coils to update */
 	struct unipi_gpiochip_device *unipi_gpiochip = gpiochip_get_data(chip);
-	//printk("gpio set %d, %d", offset, val);
+	// printk("gpio set %d, %d", offset, val);
 
-	return regmap_write(unipi_gpiochip->map, unipi_gpiochip->value_reg + offset, !!val);
+	return regmap_write(unipi_gpiochip->map,
+			    unipi_gpiochip->value_reg + offset, !!val);
 }
 #endif
 /* ToDo
-static void unipi_gpio_set_multiple(struct gpio_chip *chip, unsigned long *mask, unsigned long *bits)
+static void unipi_gpio_set_multiple(struct gpio_chip *chip, unsigned long *mask,
+unsigned long *bits)
 {
 
 }
 
-static int unipi_gpio_get_multiple(struct gpio_chip *chip, unsigned long *mask, unsigned long *bit)
+static int unipi_gpio_get_multiple(struct gpio_chip *chip, unsigned long *mask,
+unsigned long *bit)
 {
-	return 0; // OK
+        return 0; // OK
 }
 */
 
@@ -99,14 +103,16 @@ static int unipi_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
 {
 	/* 0=out, 1=in */
 	struct unipi_gpiochip_device *unipi_gpiochip = gpiochip_get_data(chip);
-	return (unipi_gpiochip->data->flags & UNIPI_GPIO_OUT)? GPIO_LINE_DIRECTION_OUT : GPIO_LINE_DIRECTION_IN;
+	return (unipi_gpiochip->data->flags & UNIPI_GPIO_OUT) ?
+		       GPIO_LINE_DIRECTION_OUT :
+		       GPIO_LINE_DIRECTION_IN;
 }
 
 static const struct unipi_gpiochip_data unipi_gpiochip_data_di = {
 	.regmap_name = "registers",
 	.is_coil_map = 0,
 	.dt_value_reg_name = "value-reg",
-	.flags		= UNIPI_GPIO_IN,
+	.flags = UNIPI_GPIO_IN,
 	.to_reg_shift = 4,
 	.to_bit_mask = 0xf,
 	.fname = "DI%d.%d",
@@ -116,7 +122,7 @@ static const struct unipi_gpiochip_data unipi_gpiochip_data_do = {
 	.regmap_name = "coils",
 	.is_coil_map = 1,
 	.dt_value_reg_name = "value-coil",
-	.flags		= UNIPI_GPIO_OUT,
+	.flags = UNIPI_GPIO_OUT,
 	.to_reg_shift = 0,
 	.to_bit_mask = 0,
 	.fname = "DO%d.%d",
@@ -126,7 +132,7 @@ static const struct unipi_gpiochip_data unipi_gpiochip_data_ro = {
 	.regmap_name = "coils",
 	.is_coil_map = 1,
 	.dt_value_reg_name = "value-coil",
-	.flags		= UNIPI_GPIO_OUT,
+	.flags = UNIPI_GPIO_OUT,
 	.to_reg_shift = 0,
 	.to_bit_mask = 0,
 	.fname = "RO%d.%d",
@@ -135,11 +141,11 @@ static const struct unipi_gpiochip_data unipi_gpiochip_data_ro = {
 struct unipi_gpio_sysfs_kobj {
 	struct kobject kobject;
 	struct unipi_gpiochip_device *gpio_dev;
-	int    index;
+	int index;
 	struct unipi_gpio_sysfs_kobj *next;
 };
-#define to_unipi_gpio_sysfs_obj(x) container_of(x, struct unipi_gpio_sysfs_kobj, kobject)
-
+#define to_unipi_gpio_sysfs_obj(x) \
+	container_of(x, struct unipi_gpio_sysfs_kobj, kobject)
 
 static void unipi_gpio_release(struct kobject *kobj)
 {
@@ -149,8 +155,8 @@ static void unipi_gpio_release(struct kobject *kobj)
 	kfree(gpio_kobj);
 }
 
-static ssize_t di_debounce_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
+static ssize_t di_debounce_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -164,8 +170,9 @@ static ssize_t di_debounce_show(struct kobject *kobj, struct kobj_attribute *att
 	return sprintf(buf, "%d\n", val);
 }
 
-static ssize_t di_debounce_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
+static ssize_t di_debounce_store(struct kobject *kobj,
+				 struct kobj_attribute *attr, const char *buf,
+				 size_t count)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -180,15 +187,15 @@ static ssize_t di_debounce_store(struct kobject *kobj, struct kobj_attribute *at
 	return count;
 }
 
-static ssize_t di_counter_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
+static ssize_t di_counter_show(struct kobject *kobj,
+			       struct kobj_attribute *attr, char *buf)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
 	unsigned int val, reg;
 	int ret;
 
-	reg = unipi_gpiochip->counter_reg + 2*gpio_kobj->index;
+	reg = unipi_gpiochip->counter_reg + 2 * gpio_kobj->index;
 
 	ret = regmap_bulk_read(unipi_gpiochip->map, reg, &val, 2);
 	if (ret)
@@ -196,39 +203,43 @@ static ssize_t di_counter_show(struct kobject *kobj, struct kobj_attribute *attr
 	return sprintf(buf, "%d\n", val);
 }
 
-static ssize_t di_counter_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
+static ssize_t di_counter_store(struct kobject *kobj,
+				struct kobj_attribute *attr, const char *buf,
+				size_t count)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
 	unsigned int val, reg;
 	int ret;
 
-	reg = unipi_gpiochip->counter_reg + 2*gpio_kobj->index;
+	reg = unipi_gpiochip->counter_reg + 2 * gpio_kobj->index;
 	ret = kstrtoint(buf, 10, &val);
 	if (ret < 0)
 		return ret;
-    regmap_bulk_write(unipi_gpiochip->map, reg, &val, 2);
+	regmap_bulk_write(unipi_gpiochip->map, reg, &val, 2);
 	return count;
 }
 
 static ssize_t di_value_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
+			     char *buf)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
 	unsigned int val, offs;
 	int ret;
 
-	offs = unipi_gpiochip->value_reg + (gpio_kobj->index >> unipi_gpiochip->data->to_reg_shift);
+	offs = unipi_gpiochip->value_reg +
+	       (gpio_kobj->index >> unipi_gpiochip->data->to_reg_shift);
 	ret = regmap_read(unipi_gpiochip->map, offs, &val);
 	if (ret)
 		return ret;
-	return sprintf(buf, "%d\n", !!(val & BIT(gpio_kobj->index & unipi_gpiochip->data->to_bit_mask)));
+	return sprintf(buf, "%d\n",
+		       !!(val & BIT(gpio_kobj->index &
+				    unipi_gpiochip->data->to_bit_mask)));
 }
 
 static ssize_t do_value_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
+			     char *buf)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -243,7 +254,7 @@ static ssize_t do_value_show(struct kobject *kobj, struct kobj_attribute *attr,
 }
 
 static ssize_t do_value_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
+			      const char *buf, size_t count)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -259,7 +270,7 @@ static ssize_t do_value_store(struct kobject *kobj, struct kobj_attribute *attr,
 }
 
 static ssize_t ds_enable_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
+			      char *buf)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -273,8 +284,9 @@ static ssize_t ds_enable_show(struct kobject *kobj, struct kobj_attribute *attr,
 	return sprintf(buf, "%d\n", !!(val & 1));
 }
 
-static ssize_t ds_enable_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
+static ssize_t ds_enable_store(struct kobject *kobj,
+			       struct kobj_attribute *attr, const char *buf,
+			       size_t count)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -290,7 +302,7 @@ static ssize_t ds_enable_store(struct kobject *kobj, struct kobj_attribute *attr
 }
 
 static ssize_t ds_toggle_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
+			      char *buf)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -304,8 +316,9 @@ static ssize_t ds_toggle_show(struct kobject *kobj, struct kobj_attribute *attr,
 	return sprintf(buf, "%d\n", !!(val & 1));
 }
 
-static ssize_t ds_toggle_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
+static ssize_t ds_toggle_store(struct kobject *kobj,
+			       struct kobj_attribute *attr, const char *buf,
+			       size_t count)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -321,7 +334,7 @@ static ssize_t ds_toggle_store(struct kobject *kobj, struct kobj_attribute *attr
 }
 
 static ssize_t ds_inv_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
+			   char *buf)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -336,7 +349,7 @@ static ssize_t ds_inv_show(struct kobject *kobj, struct kobj_attribute *attr,
 }
 
 static ssize_t ds_inv_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
+			    const char *buf, size_t count)
 {
 	struct unipi_gpio_sysfs_kobj *gpio_kobj = to_unipi_gpio_sysfs_obj(kobj);
 	struct unipi_gpiochip_device *unipi_gpiochip = gpio_kobj->gpio_dev;
@@ -351,13 +364,20 @@ static ssize_t ds_inv_store(struct kobject *kobj, struct kobj_attribute *attr,
 	return count;
 }
 
-static struct kobj_attribute gpio_attr_di_debounce = __ATTR(debounce, 0664, di_debounce_show, di_debounce_store);
-static struct kobj_attribute gpio_attr_di_counter = __ATTR(counter, 0664, di_counter_show, di_counter_store);
-static struct kobj_attribute gpio_attr_di_value = __ATTR(value, 0444, di_value_show, NULL);
-static struct kobj_attribute gpio_attr_do_value = __ATTR(value, 0664, do_value_show, do_value_store);
-static struct kobj_attribute gpio_attr_ds_enable = __ATTR(ds-enable, 0664, ds_enable_show, ds_enable_store);
-static struct kobj_attribute gpio_attr_ds_toggle = __ATTR(ds-toggle, 0664, ds_toggle_show, ds_toggle_store);
-static struct kobj_attribute gpio_attr_ds_inv = __ATTR(ds-inv, 0664, ds_inv_show, ds_inv_store);
+static struct kobj_attribute gpio_attr_di_debounce =
+	__ATTR(debounce, 0664, di_debounce_show, di_debounce_store);
+static struct kobj_attribute gpio_attr_di_counter =
+	__ATTR(counter, 0664, di_counter_show, di_counter_store);
+static struct kobj_attribute gpio_attr_di_value =
+	__ATTR(value, 0444, di_value_show, NULL);
+static struct kobj_attribute gpio_attr_do_value =
+	__ATTR(value, 0664, do_value_show, do_value_store);
+static struct kobj_attribute gpio_attr_ds_enable =
+	__ATTR(ds - enable, 0664, ds_enable_show, ds_enable_store);
+static struct kobj_attribute gpio_attr_ds_toggle =
+	__ATTR(ds - toggle, 0664, ds_toggle_show, ds_toggle_store);
+static struct kobj_attribute gpio_attr_ds_inv =
+	__ATTR(ds - inv, 0664, ds_inv_show, ds_inv_store);
 
 static struct attribute *unipi_gpio_di_attrs[] = {
 	&gpio_attr_di_debounce.attr,
@@ -400,7 +420,6 @@ static struct kobj_type unipi_gpio_do_ktype = {
 	.default_groups = unipi_gpio_do_groups,
 };
 
-
 static struct kset *unipi_gpio_kset;
 
 static int unipi_gpio_probe(struct platform_device *pdev)
@@ -408,8 +427,9 @@ static int unipi_gpio_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct unipi_gpiochip_device *unipi_gpiochip;
 	struct device_node *np = dev->of_node;
-	struct unipi_iogroup_device *iogroup = to_unipi_iogroup_device(dev->parent);
-//	char name[30];
+	struct unipi_iogroup_device *iogroup =
+		to_unipi_iogroup_device(dev->parent);
+	//	char name[30];
 	int ret, i;
 
 	unipi_gpiochip = devm_kzalloc(dev, sizeof(*unipi_gpiochip), GFP_KERNEL);
@@ -419,11 +439,14 @@ static int unipi_gpio_probe(struct platform_device *pdev)
 	unipi_gpiochip->data = of_device_get_match_data(dev);
 	unipi_gpiochip->debounce_reg = unipi_gpiochip->counter_reg = -1;
 	unipi_gpiochip->ds_count = 0;
-	unipi_gpiochip->ds_enable_coil = unipi_gpiochip->ds_toggle_coil = unipi_gpiochip->ds_inv_coil = -1;
-	unipi_gpiochip->map = unipi_mfd_get_regmap(dev->parent, unipi_gpiochip->data->regmap_name);
+	unipi_gpiochip->ds_enable_coil = unipi_gpiochip->ds_toggle_coil =
+		unipi_gpiochip->ds_inv_coil = -1;
+	unipi_gpiochip->map = unipi_mfd_get_regmap(
+		dev->parent, unipi_gpiochip->data->regmap_name);
 	if (IS_ERR(unipi_gpiochip->map) || unipi_gpiochip->map == NULL) {
 		devm_kfree(dev, unipi_gpiochip);
-		dev_err(dev, "No %s regmap for Unipi device\n", unipi_gpiochip->data->regmap_name);
+		dev_err(dev, "No %s regmap for Unipi device\n",
+			unipi_gpiochip->data->regmap_name);
 		return PTR_ERR(unipi_gpiochip->map);
 	}
 
@@ -433,10 +456,12 @@ static int unipi_gpio_probe(struct platform_device *pdev)
 		dev_err(dev, "Invalid ngpio property in devicetree\n");
 		return -EINVAL;
 	}
-	ret = of_property_read_u32(np, unipi_gpiochip->data->dt_value_reg_name, &unipi_gpiochip->value_reg);
+	ret = of_property_read_u32(np, unipi_gpiochip->data->dt_value_reg_name,
+				   &unipi_gpiochip->value_reg);
 	if (ret) {
 		devm_kfree(dev, unipi_gpiochip);
-		dev_err(dev, "Invalid %s property in devicetree\n", unipi_gpiochip->data->dt_value_reg_name);
+		dev_err(dev, "Invalid %s property in devicetree\n",
+			unipi_gpiochip->data->dt_value_reg_name);
 		return -EINVAL;
 	}
 
@@ -449,40 +474,56 @@ static int unipi_gpio_probe(struct platform_device *pdev)
 	unipi_gpiochip->chip.get_direction = unipi_gpio_get_direction;
 	unipi_gpiochip->chip.can_sleep = true;
 	/* ToDo
-	unipi_gpiochip->chip.get_multiple = unipi_gpio_get_multiple;
-	unipi_gpiochip->chip.set_multiple = unipi_gpio_set_multiple;
-	*/
+  unipi_gpiochip->chip.get_multiple = unipi_gpio_get_multiple;
+  unipi_gpiochip->chip.set_multiple = unipi_gpio_set_multiple;
+  */
 	if (unipi_gpiochip->data->flags & UNIPI_GPIO_OUT) {
 		unipi_gpiochip->chip.set = unipi_gpio_set;
 	}
 
 	platform_set_drvdata(pdev, unipi_gpiochip);
 
-	ret = of_property_read_u32(np, "debounce-reg", &unipi_gpiochip->debounce_reg);
-	ret = of_property_read_u32(np, "counter-reg", &unipi_gpiochip->counter_reg);
+	ret = of_property_read_u32(np, "debounce-reg",
+				   &unipi_gpiochip->debounce_reg);
+	ret = of_property_read_u32(np, "counter-reg",
+				   &unipi_gpiochip->counter_reg);
 	ret = of_property_read_u32(np, "ds-count", &unipi_gpiochip->ds_count);
-	ret = of_property_read_u32(np, "ds-enable-coil", &unipi_gpiochip->ds_enable_coil);
-	ret = of_property_read_u32(np, "ds-toggle-coil", &unipi_gpiochip->ds_toggle_coil);
-	ret = of_property_read_u32(np, "ds-inv-coil", &unipi_gpiochip->ds_inv_coil);
+	ret = of_property_read_u32(np, "ds-enable-coil",
+				   &unipi_gpiochip->ds_enable_coil);
+	ret = of_property_read_u32(np, "ds-toggle-coil",
+				   &unipi_gpiochip->ds_toggle_coil);
+	ret = of_property_read_u32(np, "ds-inv-coil",
+				   &unipi_gpiochip->ds_inv_coil);
 
 	/* create DI/DO kobjs */
-	for (i=0; i<unipi_gpiochip->ngpio; i++) {
+	for (i = 0; i < unipi_gpiochip->ngpio; i++) {
 		struct unipi_gpio_sysfs_kobj *gpio_kobj;
-		gpio_kobj = kzalloc(sizeof(struct unipi_gpio_sysfs_kobj), GFP_KERNEL);
-		if (gpio_kobj == NULL) break;
+		gpio_kobj = kzalloc(sizeof(struct unipi_gpio_sysfs_kobj),
+				    GFP_KERNEL);
+		if (gpio_kobj == NULL)
+			break;
 		gpio_kobj->gpio_dev = unipi_gpiochip;
 		gpio_kobj->index = i;
 		gpio_kobj->kobject.kset = unipi_gpio_kset;
 
 		if (unipi_gpiochip->data->flags & UNIPI_GPIO_IN) {
-			ret = kobject_init_and_add(&gpio_kobj->kobject, &unipi_gpio_di_ktype, &dev->kobj,
-			                           unipi_gpiochip->data->fname, iogroup->address, i+1);
-		} else if (i<unipi_gpiochip->ds_count) {
-			ret = kobject_init_and_add(&gpio_kobj->kobject, &unipi_gpio_dods_ktype, &dev->kobj,
-			                           unipi_gpiochip->data->fname, iogroup->address, i+1);
+			ret = kobject_init_and_add(&gpio_kobj->kobject,
+						   &unipi_gpio_di_ktype,
+						   &dev->kobj,
+						   unipi_gpiochip->data->fname,
+						   iogroup->address, i + 1);
+		} else if (i < unipi_gpiochip->ds_count) {
+			ret = kobject_init_and_add(&gpio_kobj->kobject,
+						   &unipi_gpio_dods_ktype,
+						   &dev->kobj,
+						   unipi_gpiochip->data->fname,
+						   iogroup->address, i + 1);
 		} else {
-			ret = kobject_init_and_add(&gpio_kobj->kobject, &unipi_gpio_do_ktype, &dev->kobj,
-			                           unipi_gpiochip->data->fname, iogroup->address, i+1);
+			ret = kobject_init_and_add(&gpio_kobj->kobject,
+						   &unipi_gpio_do_ktype,
+						   &dev->kobj,
+						   unipi_gpiochip->data->fname,
+						   iogroup->address, i + 1);
 		}
 		if (ret < 0) {
 			kfree(gpio_kobj);
@@ -493,20 +534,22 @@ static int unipi_gpio_probe(struct platform_device *pdev)
 		unipi_gpiochip->kobj = gpio_kobj;
 	}
 
-	return devm_gpiochip_add_data(&pdev->dev, &unipi_gpiochip->chip, unipi_gpiochip);
+	return devm_gpiochip_add_data(&pdev->dev, &unipi_gpiochip->chip,
+				      unipi_gpiochip);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
 static int unipi_gpio_remove(struct platform_device *pdev)
 #else
 static void unipi_gpio_remove(struct platform_device *pdev)
 #endif
 {
-	struct unipi_gpiochip_device *unipi_gpiochip = (struct unipi_gpiochip_device*) platform_get_drvdata(pdev);
+	struct unipi_gpiochip_device *unipi_gpiochip =
+		(struct unipi_gpiochip_device *)platform_get_drvdata(pdev);
 	struct unipi_gpio_sysfs_kobj *kobj, *kobj_d;
 
 	if (!unipi_gpiochip || !unipi_gpiochip->data)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
 		return 0;
 #else
 		return;
@@ -518,7 +561,7 @@ static void unipi_gpio_remove(struct platform_device *pdev)
 		kobject_del(&kobj_d->kobject);
 		kobject_put(&kobj_d->kobject);
 	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
 	return 0;
 #endif
 }
@@ -532,12 +575,13 @@ static const struct of_device_id of_unipi_gpio_match[] = {
 MODULE_DEVICE_TABLE(of, of_unipi_gpio_match);
 
 static struct platform_driver unipi_gpio_driver = {
-	.probe		= unipi_gpio_probe,
-	.remove		= unipi_gpio_remove,
-	.driver		= {
-		.name	= "unipi-gpio",
-		.of_match_table = of_unipi_gpio_match,
-	},
+    .probe = unipi_gpio_probe,
+    .remove = unipi_gpio_remove,
+    .driver =
+        {
+            .name = "unipi-gpio",
+            .of_match_table = of_unipi_gpio_match,
+        },
 };
 
 static int __init unipi_gpio_init(void)
@@ -555,7 +599,7 @@ static void __exit unipi_gpio_exit(void)
 	return platform_driver_unregister(&unipi_gpio_driver);
 }
 
-//module_platform_driver(unipi_gpio_driver);
+// module_platform_driver(unipi_gpio_driver);
 module_init(unipi_gpio_init);
 module_exit(unipi_gpio_exit);
 

@@ -36,6 +36,14 @@ dkms:
 		done > dkms.conf
 	@cat dkms.conf
 
+format:
+	for m in ${MODULES_LIST}; do\
+		cd ${MODULES_DIR_PATH}$$m;\
+		for f in $$(find src -name '*.c' -o -name '*.h'); do\
+			clang-format -i --style='file' ${MODULES_DIR_PATH}$$m$$f;\
+			done;\
+		done
+
 clean:
 	for m in ${MODULES_LIST}; do\
 		cd ${MODULES_DIR_PATH}$$m; $(MAKE) clean;\

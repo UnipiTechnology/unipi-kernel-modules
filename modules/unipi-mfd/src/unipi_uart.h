@@ -24,8 +24,7 @@
 /***************
  * Definitions *
  ***************/
-#define PORT_UNIPI			184
-
+#define PORT_UNIPI 184
 
 /*************************
  * Function Declarations *

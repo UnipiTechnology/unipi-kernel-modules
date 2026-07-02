@@ -12,13 +12,13 @@
  */
 
 #include <linux/err.h>
-#include <linux/mutex.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/userspace-consumer.h>
 #include <linux/slab.h>
-#include <linux/of.h>
 #include <linux/version.h>
 
 struct userspace_consumer_data {
@@ -31,16 +31,16 @@ struct userspace_consumer_data {
 	struct regulator_bulk_data *supplies;
 };
 
-static ssize_t name_show(struct device *dev,
-			 struct device_attribute *attr, char *buf)
+static ssize_t name_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
 {
 	struct userspace_consumer_data *data = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%s\n", data->name);
 }
 
-static ssize_t state_show(struct device *dev,
-			  struct device_attribute *attr, char *buf)
+static ssize_t state_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
 {
 	struct userspace_consumer_data *data = dev_get_drvdata(dev);
 
@@ -58,9 +58,9 @@ static ssize_t state_store(struct device *dev, struct device_attribute *attr,
 	int ret;
 
 	/*
-	 * sysfs_streq() doesn't need the \n's, but we add them so the strings
-	 * will be shared with show_state(), above.
-	 */
+   * sysfs_streq() doesn't need the \n's, but we add them so the strings
+   * will be shared with show_state(), above.
+   */
 	if (sysfs_streq(buf, "enabled\n") || sysfs_streq(buf, "1"))
 		enabled = true;
 	else if (sysfs_streq(buf, "disabled\n") || sysfs_streq(buf, "0"))
@@ -99,11 +99,11 @@ static struct attribute *attributes[] = {
 };
 
 static const struct attribute_group attr_group = {
-	.attrs	= attributes,
+	.attrs = attributes,
 };
 
-static struct regulator_userspace_consumer_data *get_pdata_from_dt_node(
-		struct platform_device *pdev)
+static struct regulator_userspace_consumer_data *
+get_pdata_from_dt_node(struct platform_device *pdev)
 {
 	struct regulator_userspace_consumer_data *pdata;
 	struct device_node *np = pdev->dev.of_node;
@@ -126,8 +126,9 @@ static struct regulator_userspace_consumer_data *get_pdata_from_dt_node(
 		return ERR_PTR(-EINVAL);
 	}
 	pdata->num_supplies = num_supplies;
-	pdata->supplies = devm_kzalloc(&pdev->dev, num_supplies *
-				sizeof(*pdata->supplies), GFP_KERNEL);
+	pdata->supplies = devm_kzalloc(&pdev->dev,
+				       num_supplies * sizeof(*pdata->supplies),
+				       GFP_KERNEL);
 	if (!pdata->supplies)
 		return ERR_PTR(-ENOMEM);
 
@@ -152,9 +153,8 @@ static int regulator_userspace_consumer_probe(struct platform_device *pdev)
 	if (!pdata)
 		return -EINVAL;
 
-	drvdata = devm_kzalloc(&pdev->dev,
-			       sizeof(struct userspace_consumer_data),
-			       GFP_KERNEL);
+	drvdata = devm_kzalloc(
+		&pdev->dev, sizeof(struct userspace_consumer_data), GFP_KERNEL);
 	if (drvdata == NULL)
 		return -ENOMEM;
 
@@ -179,8 +179,8 @@ static int regulator_userspace_consumer_probe(struct platform_device *pdev)
 		ret = regulator_bulk_enable(drvdata->num_supplies,
 					    drvdata->supplies);
 		if (ret) {
-			dev_err(&pdev->dev,
-				"Failed to set initial state: %d\n", ret);
+			dev_err(&pdev->dev, "Failed to set initial state: %d\n",
+				ret);
 			goto err_enable;
 		}
 	}
@@ -196,7 +196,7 @@ err_enable:
 	return ret;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
 static int regulator_userspace_consumer_remove(struct platform_device *pdev)
 #else
 static void regulator_userspace_consumer_remove(struct platform_device *pdev)
@@ -209,33 +209,35 @@ static void regulator_userspace_consumer_remove(struct platform_device *pdev)
 	if (data->enabled)
 		regulator_bulk_disable(data->num_supplies, data->supplies);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
 	return 0;
 #endif
 }
 
 static const struct of_device_id regulator_userspace_consumer_of_match[] = {
-	{ .compatible = "unipi-consumer", },
+	{
+		.compatible = "unipi-consumer",
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, regulator_userspace_consumer_of_match);
 
 static struct platform_driver regulator_userspace_consumer_driver = {
-	.probe		= regulator_userspace_consumer_probe,
-	.remove		= regulator_userspace_consumer_remove,
-	.driver		= {
-		.name		= "unipi-consumer",
-		.of_match_table = regulator_userspace_consumer_of_match,
-	},
+    .probe = regulator_userspace_consumer_probe,
+    .remove = regulator_userspace_consumer_remove,
+    .driver =
+        {
+            .name = "unipi-consumer",
+            .of_match_table = regulator_userspace_consumer_of_match,
+        },
 };
 
-//module_platform_driver(regulator_userspace_consumer_driver);
+// module_platform_driver(regulator_userspace_consumer_driver);
 static int __init userspace_consumer_init(void)
 {
 	return platform_driver_register(&regulator_userspace_consumer_driver);
 }
 late_initcall_sync(userspace_consumer_init);
-
 
 MODULE_AUTHOR("Mike Rapoport <mike@compulab.co.il>");
 MODULE_DESCRIPTION("Userspace consumer for voltage and current regulators");

@@ -19,6 +19,7 @@
  * Includes *
  ************/
 
+#include <asm/termbits.h>
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -27,23 +28,22 @@
 #include <linux/gpio/driver.h>
 #include <linux/i2c.h>
 #include <linux/iio/iio.h>
-#include <uapi/linux/iio/types.h>
 #include <linux/iio/sysfs.h>
+#include <linux/leds.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
-#include <linux/serial_core.h>
 #include <linux/serial.h>
+#include <linux/serial_core.h>
+#include <linux/spi/spi.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
-#include <linux/spi/spi.h>
-#include <linux/leds.h>
 #include <linux/uaccess.h>
-#include <asm/termbits.h>
-//#include <asm/gpio.h>
+#include <uapi/linux/iio/types.h>
+// #include <asm/gpio.h>
 
 /***************
  * Definitions *
@@ -51,13 +51,11 @@
 
 #define UNIPI_MODULE_MAJOR_VERSIONSTRING "2.74:2025:03:06"
 
-#define UNIPI_SPI_DETAILED_DEBUG    0
+#define UNIPI_SPI_DETAILED_DEBUG 0
 #define UNIPI_MODBUS_DETAILED_DEBUG 0
-#define UNIPI_TTY_DETAILED_DEBUG    0
-
+#define UNIPI_TTY_DETAILED_DEBUG 0
 
 #define lo(x) (x & 0xff)
 #define hi(x) (x >> 8)
-
 
 #endif /* MODULES_NEURON_SPI_SRC_UNIPI_COMMON_H_ */

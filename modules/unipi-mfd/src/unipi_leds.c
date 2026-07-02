@@ -6,17 +6,17 @@
  * Author: Miroslav Ondra <ondra@faster.cz>
  */
 
-#include <linux/io.h>
 #include <linux/init.h>
+#include <linux/io.h>
 #include <linux/jiffies.h>
-#include <linux/of_device.h>
-#include <linux/of_address.h>
-#include <linux/platform_device.h>
-#include <linux/stat.h>
-#include <linux/slab.h>
-#include <linux/mfd/syscon.h>
-#include <linux/regmap.h>
 #include <linux/leds.h>
+#include <linux/mfd/syscon.h>
+#include <linux/of_address.h>
+#include <linux/of_device.h>
+#include <linux/platform_device.h>
+#include <linux/regmap.h>
+#include <linux/slab.h>
+#include <linux/stat.h>
 
 #include "unipi_common.h"
 #include "unipi_mfd.h"
@@ -26,17 +26,16 @@
 struct unipi_led {
 	struct led_classdev cdev;
 	struct regmap *map;
-	u32    reg;
-	bool   state;
+	u32 reg;
+	bool state;
 	unsigned long timeout;
-	char   name[32];
+	char name[32];
 };
 
 static int unipi_led_set(struct led_classdev *led_cdev,
-                          enum led_brightness value)
+			 enum led_brightness value)
 {
-	struct unipi_led *uled =
-		container_of(led_cdev, struct unipi_led, cdev);
+	struct unipi_led *uled = container_of(led_cdev, struct unipi_led, cdev);
 	u32 val;
 	bool state;
 	int ret;
@@ -54,11 +53,12 @@ static int unipi_led_set(struct led_classdev *led_cdev,
 	return ret;
 }
 
-static void unipi_prepare_led(struct unipi_led *uled, struct device_node *parent_node, u32 reg)
+static void unipi_prepare_led(struct unipi_led *uled,
+			      struct device_node *parent_node, u32 reg)
 {
 	struct device_node *np = NULL;
 	int ret;
-	const char  *state;
+	const char *state;
 
 	for_each_child_of_node(parent_node, np) {
 		u32 child_reg = 0;
@@ -69,8 +69,8 @@ static void unipi_prepare_led(struct unipi_led *uled, struct device_node *parent
 	}
 
 	if (np) {
-		uled->cdev.name =
-			of_get_property(np, "label", NULL) ? : np->name;
+		uled->cdev.name = of_get_property(np, "label", NULL) ?:
+								       np->name;
 		uled->cdev.default_trigger =
 			of_get_property(np, "linux,default-trigger", NULL);
 
@@ -99,12 +99,12 @@ static int unipi_led_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	struct regmap *map;
 	struct unipi_led *uled;
-	//const char *state;
-	u32    coil_range[2];
-	const char   *label_prefix; 
-	int    nleds, i;
+	// const char *state;
+	u32 coil_range[2];
+	const char *label_prefix;
+	int nleds, i;
 
-	//map = dev_get_regmap(parent,"coils");
+	// map = dev_get_regmap(parent,"coils");
 	map = unipi_mfd_get_regmap(dev->parent, "coils");
 
 	if (IS_ERR(map) || map == NULL) {
@@ -114,23 +114,26 @@ static int unipi_led_probe(struct platform_device *pdev)
 	if (of_property_read_u32_array(np, "coil-range", coil_range, 2))
 		return -EINVAL;
 	if (coil_range[1] == 0) {
-		dev_err(dev, "bad coil-range for Unipi device (count must be non-zero)\n");
+		dev_err(dev,
+			"bad coil-range for Unipi device (count must be non-zero)\n");
 		return -EINVAL;
 	}
-	/*if (device_link_add(dev, dev->parent, DL_FLAG_AUTOREMOVE_CONSUMER) == NULL) {
-		dev_err(dev, "Error create link\n");
-	}*/
+	/*if (device_link_add(dev, dev->parent, DL_FLAG_AUTOREMOVE_CONSUMER) == NULL)
+  { dev_err(dev, "Error create link\n");
+  }*/
 
-	label_prefix = of_get_property(np, "label-prefix", NULL) ? :"unipi:green:uled-x";
+	label_prefix = of_get_property(np, "label-prefix", NULL) ?:
+			       "unipi:green:uled-x";
 	nleds = 0;
-	for (i=0; i<coil_range[1]; i++) {
+	for (i = 0; i < coil_range[1]; i++) {
 		uled = devm_kzalloc(dev, sizeof(*uled), GFP_KERNEL);
 		if (!uled)
 			return -ENOMEM;
 		uled->map = map;
 		uled->reg = coil_range[0] + i;
-		scnprintf(uled->name, sizeof(uled->name), "%s%x", label_prefix, i+1);
-		//dev_info(dev, "led %s\n", uled->name);
+		scnprintf(uled->name, sizeof(uled->name), "%s%x", label_prefix,
+			  i + 1);
+		// dev_info(dev, "led %s\n", uled->name);
 		uled->cdev.name = uled->name;
 		unipi_prepare_led(uled, np, i);
 		uled->cdev.brightness_set_blocking = unipi_led_set;
@@ -138,24 +141,27 @@ static int unipi_led_probe(struct platform_device *pdev)
 			nleds++;
 	}
 
-	//platform_set_drvdata(pdev, uled);
+	// platform_set_drvdata(pdev, uled);
 	dev_info(dev, "registered %d LEDs\n", nleds);
 	return 0;
 }
 
 static const struct of_device_id of_unipi_leds_match[] = {
-	{ .compatible = "unipi,leds", },
+	{
+		.compatible = "unipi,leds",
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, of_unipi_leds_match);
 
 static struct platform_driver unipi_led_driver = {
-	.probe		= unipi_led_probe,
-	.driver		= {
-		.name	= "unipi-leds",
-		.of_match_table = of_match_ptr(of_unipi_leds_match),
-		.suppress_bind_attrs = true,
-	},
+    .probe = unipi_led_probe,
+    .driver =
+        {
+            .name = "unipi-leds",
+            .of_match_table = of_match_ptr(of_unipi_leds_match),
+            .suppress_bind_attrs = true,
+        },
 };
 
 module_platform_driver(unipi_led_driver);

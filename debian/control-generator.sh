@@ -15,7 +15,7 @@ if [ -z "${PRODUCT}" ]; then
     ################## dkms #################333
     BINARY_PKG_NAME=unipi-kernel-modules-dkms
     unset pre_depends
-    depends="raspberrypi-kernel-headers | unipi-kernel-headers | linux-headers-rpi-v8 | linux-headers-rpi-2712, unipi-os-configurator-data"
+    depends="raspberrypi-kernel-headers | unipi-kernel-headers | linux-headers-rpi-v7 |linux-headers-rpi-v8 | linux-headers-rpi-2712, unipi-os-configurator-data"
     unset suggests
     cat >debian/rules.in <<EOF
 %:

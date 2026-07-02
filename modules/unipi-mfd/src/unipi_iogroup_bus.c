@@ -1,39 +1,41 @@
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/nvmem-consumer.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
-#include <linux/nvmem-consumer.h>
-//#include <linux/device/bus.h>
+// #include <linux/device/bus.h>
 
-#include "unipi_iogroup_bus.h"
 #include "unipi_channel.h"
+#include "unipi_iogroup_bus.h"
 
-struct unipi_iogroup_device *iogroup_alloc_device(struct unipi_channel *channel);
+struct unipi_iogroup_device *
+iogroup_alloc_device(struct unipi_channel *channel);
 int iogroup_add_device(struct unipi_iogroup_device *iogroup);
-
 
 static void iogroupdev_release(struct device *dev)
 {
-	struct unipi_iogroup_device	*iogroup = to_unipi_iogroup_device(dev);
+	struct unipi_iogroup_device *iogroup = to_unipi_iogroup_device(dev);
 
 	/* iogroup channel may cleanup for released devices */
-	//if (iogroup->channel->cleanup)
+	// if (iogroup->channel->cleanup)
 	//	iogroup->channel->cleanup(iogroup);
 
 	unipi_channel_put(iogroup->channel);
 	kfree(iogroup);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
 static int iogroup_match_device(struct device *dev, struct device_driver *drv)
 #else
-static int iogroup_match_device(struct device *dev, const struct device_driver *drv)
+static int iogroup_match_device(struct device *dev,
+				const struct device_driver *drv)
 #endif
 {
-	const struct unipi_iogroup_device	*iogroup = to_unipi_iogroup_device(dev);
+	const struct unipi_iogroup_device *iogroup =
+		to_unipi_iogroup_device(dev);
 
 	/* Attempt an OF style match */
 	if (of_driver_match_device(dev, drv))
@@ -41,37 +43,39 @@ static int iogroup_match_device(struct device *dev, const struct device_driver *
 
 	return strcmp(iogroup->modalias, drv->name) == 0;
 }
-/* MODALIAS= must be add to environment of udev message. Action rule based on MODALIAS loads module
-	MODALIAS is created according to compatible string, or iogroup:<modalias>, 
-	         which is compatible without unipi,
+/* MODALIAS= must be add to environment of udev message. Action rule based on
+   MODALIAS loads module MODALIAS is created according to compatible string, or
+   iogroup:<modalias>, which is compatible without unipi,
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,3,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
 static int iogroup_uevent(struct device *dev, struct kobj_uevent_env *env)
 #else
 static int iogroup_uevent(const struct device *dev, struct kobj_uevent_env *env)
 #endif
 {
-	const struct unipi_iogroup_device *iogroup = \
-                   dev ? container_of(dev, struct unipi_iogroup_device, dev) : NULL;
-	//const struct unipi_iogroup_device  *iogroup = to_unipi_iogroup_device(dev);
+	const struct unipi_iogroup_device *iogroup =
+		dev ? container_of(dev, struct unipi_iogroup_device, dev) :
+		      NULL;
+	// const struct unipi_iogroup_device  *iogroup = to_unipi_iogroup_device(dev);
 	if (of_device_uevent_modalias(dev, env) == 0)
 		return 0;
-	return add_uevent_var(env, "MODALIAS=%s%s", "iogroup:", iogroup->modalias);
+	return add_uevent_var(env, "MODALIAS=%s%s",
+			      "iogroup:", iogroup->modalias);
 }
 
 struct bus_type iogroup_bus_type = {
-	.name       = "iogroup",
-	.match      = iogroup_match_device,
+	.name = "iogroup",
+	.match = iogroup_match_device,
 	//.dev_groups = spi_dev_groups,
-	.uevent     = iogroup_uevent,
+	.uevent = iogroup_uevent,
 };
 EXPORT_SYMBOL_GPL(iogroup_bus_type);
 
-
 static int iogroup_drv_probe(struct device *dev)
 {
-	const struct unipi_iogroup_driver	*sdrv = to_unipi_iogroup_driver(dev->driver);
-	struct unipi_iogroup_device			*iogroup = to_unipi_iogroup_device(dev);
+	const struct unipi_iogroup_driver *sdrv =
+		to_unipi_iogroup_driver(dev->driver);
+	struct unipi_iogroup_device *iogroup = to_unipi_iogroup_device(dev);
 	int ret;
 
 	ret = dev_pm_domain_attach(dev, true);
@@ -94,10 +98,10 @@ static int iogroup_drv_probe(struct device *dev)
 	return ret;
 }
 
-
 static int iogroup_drv_remove(struct device *dev)
 {
-	const struct unipi_iogroup_driver		*sdrv = to_unipi_iogroup_driver(dev->driver);
+	const struct unipi_iogroup_driver *sdrv =
+		to_unipi_iogroup_driver(dev->driver);
 	int ret = 0;
 
 	if (sdrv->remove)
@@ -108,7 +112,8 @@ static int iogroup_drv_remove(struct device *dev)
 }
 static void iogroup_drv_shutdown(struct device *dev)
 {
-	const struct unipi_iogroup_driver *sdrv = to_unipi_iogroup_driver(dev->driver);
+	const struct unipi_iogroup_driver *sdrv =
+		to_unipi_iogroup_driver(dev->driver);
 
 	sdrv->shutdown(to_unipi_iogroup_device(dev));
 }
@@ -121,7 +126,8 @@ static void iogroup_drv_shutdown(struct device *dev)
  *
  * Return: zero on success, else a negative error code.
  */
-int __unipi_iogroup_register_driver(struct module *owner, struct unipi_iogroup_driver *sdrv)
+int __unipi_iogroup_register_driver(struct module *owner,
+				    struct unipi_iogroup_driver *sdrv)
 {
 	sdrv->driver.owner = owner;
 	sdrv->driver.bus = &iogroup_bus_type;
@@ -132,7 +138,6 @@ int __unipi_iogroup_register_driver(struct module *owner, struct unipi_iogroup_d
 	return driver_register(&sdrv->driver);
 }
 EXPORT_SYMBOL_GPL(__unipi_iogroup_register_driver);
-
 
 /*
  * Prevents addition of devices with same address
@@ -158,7 +163,7 @@ static DEFINE_MUTEX(iogroup_add_lock);
  */
 struct unipi_iogroup_device *iogroup_alloc_device(struct unipi_channel *channel)
 {
-	struct unipi_iogroup_device	*iogroup;
+	struct unipi_iogroup_device *iogroup;
 
 	if (!unipi_channel_get(channel))
 		return NULL;
@@ -174,13 +179,12 @@ struct unipi_iogroup_device *iogroup_alloc_device(struct unipi_channel *channel)
 	iogroup->dev.bus = &iogroup_bus_type;
 	iogroup->dev.release = iogroupdev_release;
 
-	//spin_lock_init(&iogroup->statistics.lock);
+	// spin_lock_init(&iogroup->statistics.lock);
 
 	device_initialize(&iogroup->dev);
 	return iogroup;
 }
 EXPORT_SYMBOL_GPL(iogroup_alloc_device);
-
 
 static int iogroup_dev_check(struct device *dev, void *data)
 {
@@ -194,7 +198,8 @@ static int iogroup_dev_check(struct device *dev, void *data)
 }
 
 /**
- * iogroup_add_device - Add unipi_iogroup_device allocated with iogroup_alloc_device
+ * iogroup_add_device - Add unipi_iogroup_device allocated with
+ * iogroup_alloc_device
  * @iogroup: unipi_iogroup_device to register
  *
  * Companion function to iogroup_alloc_device.  Devices allocated with
@@ -208,26 +213,28 @@ int iogroup_add_device(struct unipi_iogroup_device *iogroup)
 	int status;
 
 	/* Set the bus ID string */
-	//dev_set_name(&iogroup->dev, "%s.%u", dev_name(&iogroup->plc->pdev->dev),
+	// dev_set_name(&iogroup->dev, "%s.%u", dev_name(&iogroup->plc->pdev->dev),
 	dev_set_name(dev, "iogroup%u", iogroup->address);
 
-	//request_module("unipi_iogroup");
+	// request_module("unipi_iogroup");
 	/* We need to make sure there's no other device with this
-	 * address **BEFORE** we call setup(), else we'll trash
-	 * its configuration.  Lock against concurrent add() calls.
-	 */
+   * address **BEFORE** we call setup(), else we'll trash
+   * its configuration.  Lock against concurrent add() calls.
+   */
 	mutex_lock(&iogroup_add_lock);
 
-	status = bus_for_each_dev(&iogroup_bus_type, NULL, iogroup, iogroup_dev_check);
+	status = bus_for_each_dev(&iogroup_bus_type, NULL, iogroup,
+				  iogroup_dev_check);
 	if (status) {
 		dev_err(dev, "address %d already in use\n", iogroup->address);
 		goto done;
 	}
-	//of_device_request_module(&iogroup->dev);
+	// of_device_request_module(&iogroup->dev);
 	/* Device may be bound to an active driver when this returns */
 	status = device_add(dev);
 	if (status < 0)
-		dev_err(dev->parent, "can't add %s, status %d\n", dev_name(dev), status);
+		dev_err(dev->parent, "can't add %s, status %d\n", dev_name(dev),
+			status);
 	else
 		dev_dbg(dev->parent, "registered child %s\n", dev_name(dev));
 
@@ -257,9 +264,9 @@ void iogroup_unregister_device(struct unipi_iogroup_device *iogroup)
 }
 EXPORT_SYMBOL_GPL(iogroup_unregister_device);
 
-
 struct unipi_iogroup_device *
-register_iogroup_device(struct unipi_channel *channel, int reg, const char* modalias)
+register_iogroup_device(struct unipi_channel *channel, int reg,
+			const char *modalias)
 {
 	struct unipi_iogroup_device *iogroup;
 	int rc;
@@ -267,20 +274,22 @@ register_iogroup_device(struct unipi_channel *channel, int reg, const char* moda
 	/* Alloc an spi_device */
 	iogroup = iogroup_alloc_device(channel);
 	if (!iogroup) {
-		dev_err(channel->dev, "iogroup device alloc error for reg=%d\n", reg);
+		dev_err(channel->dev, "iogroup device alloc error for reg=%d\n",
+			reg);
 		rc = -ENOMEM;
 		goto err_out;
 	}
 
 	/* Select device driver */
 	strncpy(iogroup->modalias, modalias, sizeof(iogroup->modalias));
-	iogroup->modalias[sizeof(iogroup->modalias)-1] = 0;
+	iogroup->modalias[sizeof(iogroup->modalias) - 1] = 0;
 	iogroup->address = reg;
 
 	/* Register the new device */
 	rc = iogroup_add_device(iogroup);
 	if (rc) {
-		dev_err(channel->dev, "iogroup register error for reg=%d\n", reg);
+		dev_err(channel->dev, "iogroup register error for reg=%d\n",
+			reg);
 	}
 
 	return iogroup;
@@ -292,7 +301,8 @@ err_out:
 EXPORT_SYMBOL_GPL(register_iogroup_device);
 
 struct unipi_iogroup_device *
-of_register_iogroup_device(struct unipi_channel *channel, struct device_node *nc)
+of_register_iogroup_device(struct unipi_channel *channel,
+			   struct device_node *nc)
 {
 	struct unipi_iogroup_device *iogroup;
 	u32 value;
@@ -301,19 +311,19 @@ of_register_iogroup_device(struct unipi_channel *channel, struct device_node *nc
 	/* Alloc an spi_device */
 	iogroup = iogroup_alloc_device(channel);
 	if (!iogroup) {
-		dev_err(channel->dev, "iogroup device alloc error for %pOF\n", nc);
+		dev_err(channel->dev, "iogroup device alloc error for %pOF\n",
+			nc);
 		rc = -ENOMEM;
 		goto err_out;
 	}
 
 #ifdef CONFIG_OF
 	/* Select device driver */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,6,0)
-	rc = of_modalias_node(nc, iogroup->modalias,
-				sizeof(iogroup->modalias));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+	rc = of_modalias_node(nc, iogroup->modalias, sizeof(iogroup->modalias));
 #else
 	rc = of_alias_from_compatible(nc, iogroup->modalias,
-				sizeof(iogroup->modalias));
+				      sizeof(iogroup->modalias));
 #endif
 #else
 	rc = -ENOENT;
@@ -352,32 +362,29 @@ err_out:
 }
 EXPORT_SYMBOL_GPL(of_register_iogroup_device);
 
-
 static int iogroup_check_and_unregister(struct device *dev, void *data)
 {
 	struct unipi_iogroup_device *iogroup = to_unipi_iogroup_device(dev);
-	struct unipi_channel *channel = (struct unipi_channel*) data;
+	struct unipi_channel *channel = (struct unipi_channel *)data;
 	if (iogroup->channel == channel)
-	    iogroup_unregister_device(iogroup);
+		iogroup_unregister_device(iogroup);
 	return 0;
 }
 
-
 void iogroup_unregister_by_channel(struct unipi_channel *channel)
 {
-	bus_for_each_dev(&iogroup_bus_type, NULL, channel, iogroup_check_and_unregister);
+	bus_for_each_dev(&iogroup_bus_type, NULL, channel,
+			 iogroup_check_and_unregister);
 }
 EXPORT_SYMBOL_GPL(iogroup_unregister_by_channel);
-
 
 /*
 static int __unregister(struct device *dev, void *null)
 {
-	iogroup_unregister_device(to_unipi_iogroup_device(dev));
-	return 0;
+        iogroup_unregister_device(to_unipi_iogroup_device(dev));
+        return 0;
 }
 */
-
 
 static int __init unipi_iogroup_bus_init(void)
 {
@@ -391,7 +398,6 @@ static void __exit unipi_iogroup_bus_exit(void)
 
 module_init(unipi_iogroup_bus_init);
 module_exit(unipi_iogroup_bus_exit);
-
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Miroslav Ondra <ondra@faster.cz>");

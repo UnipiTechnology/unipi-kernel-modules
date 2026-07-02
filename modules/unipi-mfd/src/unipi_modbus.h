@@ -1,6 +1,6 @@
 /*
  * Unipi PLC modbus channel driver - Copyright (C) 2024 Unipi Technology
- * 
+ *
  * Author: Tomas Knot <tomasknot@gmail.com>
  * Author: Miroslav Ondra <ondra@faster.cz>
  *
@@ -14,31 +14,31 @@
 #ifndef MODULES_UNIPI_SPI_SRC_UNIPI_MODBUS_H_
 #define MODULES_UNIPI_SPI_SRC_UNIPI_MODBUS_H_
 
-#include <linux/version.h>
-#include "unipi_common.h"
 #include "unipi_channel.h"
+#include "unipi_common.h"
+#include <linux/version.h>
 
-#define UNIPI_MODBUS_DEVICE_NAME		"unipichannel"
-#define UNIPI_MODBUS_DEVICE_NAME_T		"unipichannel%d"
-#define UNIPI_MODBUS_DEVICE_CLASS		"unipi_modbus"
-#define UNIPI_MODBUS_BUFFER_MAX			1152
-#define UNIPI_MODBUS_HEADER_SIZE		4
+#define UNIPI_MODBUS_DEVICE_NAME "unipichannel"
+#define UNIPI_MODBUS_DEVICE_NAME_T "unipichannel%d"
+#define UNIPI_MODBUS_DEVICE_CLASS "unipi_modbus"
+#define UNIPI_MODBUS_BUFFER_MAX 1152
+#define UNIPI_MODBUS_HEADER_SIZE 4
 
-enum UNIPI_MODBUS_OP
-{
-	UNIPI_MODBUS_OP_READBIT   = 0x01,
-	UNIPI_MODBUS_OP_READREG   = 0x04,
-	UNIPI_MODBUS_OP_WRITEBIT  = 0x05,
-	UNIPI_MODBUS_OP_WRITEREG  = 0x06,
+enum UNIPI_MODBUS_OP {
+	UNIPI_MODBUS_OP_READBIT = 0x01,
+	UNIPI_MODBUS_OP_READREG = 0x04,
+	UNIPI_MODBUS_OP_WRITEBIT = 0x05,
+	UNIPI_MODBUS_OP_WRITEREG = 0x06,
 	UNIPI_MODBUS_OP_WRITEBITS = 0x0F,
 };
 
-struct device* unipi_modbus_classdev_register(struct unipi_channel *channel, u8 address);
+struct device *unipi_modbus_classdev_register(struct unipi_channel *channel,
+					      u8 address);
 void unipi_modbus_classdev_unregister(struct device *dev);
 
-struct unipi_channel * unipi_modbus_dev_by_address(u8 modbus_address);
+struct unipi_channel *unipi_modbus_dev_by_address(u8 modbus_address);
 
-//int __init unipi_modbus_init(void);
-//void __exit unipi_modbus_exit(void);
+// int __init unipi_modbus_init(void);
+// void __exit unipi_modbus_exit(void);
 
 #endif /* MODULES_UNIPI_SPI_SRC_UNIPI_MODBUS_H_ */
